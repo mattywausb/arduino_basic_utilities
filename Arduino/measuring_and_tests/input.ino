@@ -42,7 +42,7 @@ void input_setup() {
 
 
   /* Initalize the encoder */
-  input_setEncoderRange(1, 20, 1, 1); /* Set Encoder to count from 1 to 20  as default (number of ticks of my test hardware) */
+  input_setEncoderRange(1, 20, 1, true); /* Set Encoder to count from 1 to 20  as default (number of ticks of my test hardware) */
 
   attachInterrupt(digitalPinToInterrupt(ENCODER_CLOCK_PIN),encoder_clock_change_ISR,CHANGE);
 
@@ -89,6 +89,7 @@ void input_setEncoderRange(int rangeMin, int rangeMax, int stepSize, bool wrap) 
   input_encoder_rangeShiftValue=input_encoder_rangeMax-input_encoder_rangeMin+1;
   input_encoder_wrap = wrap;
   input_encoder_stepSize = stepSize;
+  input_setEncoderValue(input_encoder_value);
   #ifdef TRACE_INPUT
     Serial.print(F("TRACE_INPUT input_setEncoderRange:"));
     Serial.print(rangeMin); Serial.print(F("-"));
@@ -111,7 +112,9 @@ void encoder_clock_change_ISR()
   bool direction_state=digitalRead(ENCODER_DIRECTION_PIN);
   bool clock_state=digitalRead(ENCODER_CLOCK_PIN);  
 
-  digitalWrite(LED_BUILTIN, clock_state);
+  #ifdef TRACE_INPUT_ENCODER
+    digitalWrite(LED_BUILTIN, clock_state);
+  #endif
 
   if(!encoder_prev_clock_state && clock_state) { //clock changes from 0 to 1
       encoder_direction_state_start=direction_state;  
@@ -122,11 +125,13 @@ void encoder_clock_change_ISR()
   if(encoder_prev_clock_state && !clock_state) { //clock changes from 1 to 0
       bool encoder_direction_state_end=direction_state;  
       encoder_prev_clock_state=0;
-      if(encoder_direction_state_start && !encoder_direction_state_end) { // turned clockwise direction 
-        encoder_change_value+=1;
-      }
-      if(!encoder_direction_state_start && encoder_direction_state_end) { // turned counter clockwise
-       encoder_change_value-=1;
+      if(encoder_direction_state_start) {
+        if (!encoder_direction_state_end) { // turned clockwise direction 
+          encoder_change_value+=1;
+        }
+      } else { if(encoder_direction_state_end) { // turned counter clockwise
+        encoder_change_value-=1;
+        }
       }
       encoder_direction_state_start=encoder_direction_state_end;
   }
