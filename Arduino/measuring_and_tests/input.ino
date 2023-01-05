@@ -11,14 +11,18 @@
 
 /* Encoder constants and variables for IDS tracking function */
 
-#define ENCODER_CLOCK_PIN 2
-#define ENCODER_DIRECTION_PIN 4
+#define ENCODER_CLOCK_PIN 3
+#define ENCODER_DIRECTION_PIN 2
+#define ENCODER_PRESS_PIN 4
 #define ENCODER_MAX_CHANGE_PER_TICK 100
 
-volatile bool encoder_prev_clock_state=false;
-volatile bool encoder_direction_state_start=false;
+volatile bool encoder_prev_clock_state=HIGH;
+volatile bool encoder_direction_state_start=HIGH;
+#ifdef TRACE_INPUT_ENCODER
+  volatile byte isr_call_count=0;
+#endif  
 
-volatile int encoder_change_value = 0;
+volatile int8_t encoder_change_value = 0;
 
 /* encoder variables */
 int input_encoder_value = 0;
@@ -113,24 +117,26 @@ void encoder_clock_change_ISR()
   bool clock_state=digitalRead(ENCODER_CLOCK_PIN);  
 
   #ifdef TRACE_INPUT_ENCODER
-    digitalWrite(LED_BUILTIN, clock_state);
+    digitalWrite(LED_BUILTIN, !clock_state);
+    isr_call_count++;
   #endif
 
-  if(!encoder_prev_clock_state && clock_state) { //clock changes from 0 to 1
+  if(encoder_prev_clock_state && !clock_state) { //clock changes from 1 to 0 (start of cycle in PULL UP logic)
       encoder_direction_state_start=direction_state;  
-      encoder_prev_clock_state=1;
+      encoder_prev_clock_state=clock_state;
       return;
   }
 
-  if(encoder_prev_clock_state && !clock_state) { //clock changes from 1 to 0
+  if(!encoder_prev_clock_state && clock_state) { //clock changes from 1 to 0 (end of cycle PULL UP logic)
       bool encoder_direction_state_end=direction_state;  
-      encoder_prev_clock_state=0;
-      if(encoder_direction_state_start) {
-        if (!encoder_direction_state_end) { // turned clockwise direction 
-          encoder_change_value+=1;
+      encoder_prev_clock_state=clock_state;
+      if(!encoder_direction_state_start) {
+        if (encoder_direction_state_end) { // turned counter clockwise 
+          encoder_change_value-=1;
         }
-      } else { if(encoder_direction_state_end) { // turned counter clockwise
-        encoder_change_value-=1;
+      } else { 
+        if(!encoder_direction_state_end) { // turned  clockwise
+          encoder_change_value+=1;
         }
       }
       encoder_direction_state_start=encoder_direction_state_end;
@@ -151,22 +157,26 @@ void input_scan_tick()
   bool is_relevant_event=false;
   
   /* transfer high resolution encoder movement into tick encoder value */
-  int tick_encoder_change_value = encoder_change_value;  // Freeze the value for upcoming operations
+  int8_t tick_encoder_change_value = encoder_change_value;  // Freeze the value for upcoming operations
   if (tick_encoder_change_value) { // there are accumulated changes
     if(input_enabled && tick_encoder_change_value<ENCODER_MAX_CHANGE_PER_TICK && tick_encoder_change_value>-ENCODER_MAX_CHANGE_PER_TICK)   {
       input_encoder_value += tick_encoder_change_value * input_encoder_stepSize;
       // Wrap or limit the encoder value 
-      while (input_encoder_value > input_encoder_rangeMax)      input_encoder_value = input_encoder_wrap ? input_encoder_value-input_encoder_rangeShiftValue : input_encoder_rangeMax;
+      while (input_encoder_value > input_encoder_rangeMax) input_encoder_value = input_encoder_wrap ? input_encoder_value-input_encoder_rangeShiftValue : input_encoder_rangeMax;
       while (input_encoder_value < input_encoder_rangeMin) input_encoder_value = input_encoder_wrap ? input_encoder_value+input_encoder_rangeShiftValue : input_encoder_rangeMin;
-      #ifdef TRACE_INPUT_ENCODER
-        Serial.print(F("TRACE_INPUT_ENCODER input_switches_scan_tick:"));
-        Serial.print(F(" tick_encoder_change_value=")); Serial.print(tick_encoder_change_value);
-        Serial.print(F(" input_encoder_value=")); Serial.println(input_encoder_value);
-      #endif
+
       input_encoder_change_event = true;
       is_relevant_event=true;
     }
     encoder_change_value -= tick_encoder_change_value; // remove the transfered value from the tracking
+    #ifdef TRACE_INPUT_ENCODER
+        Serial.print(F("TRACE_INPUT_ENCODER input_switches_scan_tick:"));
+        Serial.print(F(" isr_call_count=")); Serial.print(isr_call_count);
+        Serial.print(F("\ttick_encoder_change_value=")); Serial.print(tick_encoder_change_value);
+        Serial.print(F("\tinput_encoder_value=")); Serial.print(input_encoder_value);
+        Serial.print(F("\tencoder_change_value left=")); Serial.println(encoder_change_value);
+        isr_call_count=0;
+    #endif
   }
 
   if(is_relevant_event)input_last_event_time = millis(); // Reset the global age of interaction
