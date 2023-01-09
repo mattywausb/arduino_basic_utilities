@@ -4,11 +4,10 @@
 /*
 *  Class to provide essential digital switch handling. HIGH/LOW Signal capture must be done externally, so you have the full choice how to get the signal
 *  Main features: debounce logic, duration tracking, event isolation
-*  Memory footprint: 4 Bytes per switch
+*  Memory footprint: 4 Bytes per switch (5 bytes when tracing flag changes)
 *
-*  To save memory, the time resolution and boundaries are as follows
-*  duration is stored in 8 bit with a resoluition of 128ms (that would be more then enough for user interfaces) what results in a range of 0 to 32.783ms 
-*  Function scales the value to ms to stay in the general pattern
+*  Duration is stored in 8+1 bit with a resolution of 16ms for up to 4080ms and 128ms for up to  32000ms 
+*  Reading functions scale the duratpion value to ms to stay in the general pattern
 */
 
 #ifdef TRACE_ON
@@ -18,7 +17,8 @@
 
 #define SWITCH_H_CHANGE_BIT  0x02
 #define SWITCH_H_STATE_BIT   0x01
-#define SWITCH_H_DURATION_CAP_BIT 0x04
+#define SWITCH_H_HIGH_RESOLUTION_DURATION_BIT 0x04
+#define SWITCH_H_DURATION_CAP_BIT 0x08
 #define SWITCH_H_HIGH_IS_CLOSE_BIT 0x10
 #define SWITCH_H_CHANGE_CHECK_MASK 0x03
 

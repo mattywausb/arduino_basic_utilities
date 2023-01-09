@@ -7,8 +7,9 @@
 #endif
 
 
-#define DEBOUNCE_INTERVAL 60
+#define DEBOUNCE_INTERVAL 64
 #define DURATION_CAP 32000
+#define HI_RESULOTION_LIMIT 4080
 #define DURATION_CAP_UINT8 250
  
 Switch::Switch() {
@@ -20,6 +21,8 @@ Switch::Switch() {
    m_last_duration=DURATION_CAP_UINT8;
  }
 
+
+/* configureCloseSignal */
 void Switch::configureCloseSignal(bool high_is_close)
 {
   if(high_is_close) m_state_flags|=SWITCH_H_HIGH_IS_CLOSE_BIT;
@@ -61,8 +64,15 @@ void Switch::processSignal(byte digital_readout) {
       #endif
   }
 
+  /* manage duration memory */
   if(m_state_flags&SWITCH_H_CHANGE_BIT)  { // Change noticed
-    m_last_duration = duration >> 7; //Shift by 7 bit = divide by 128 = reduce resolution to 128ms
+    if(duration<=HI_RESULOTION_LIMIT) {
+        m_last_duration = duration >> 4 ;// high precision tracking Shift by 4 bit = divide by 16
+        m_state_flags |=  SWITCH_H_HIGH_RESOLUTION_DURATION_BIT;
+    }  else  {
+      m_last_duration = duration >> 7; // low precisions tracking Shift by 7 bit = divide by 128 = reduce resolution to 128ms
+      m_state_flags &=  ~SWITCH_H_HIGH_RESOLUTION_DURATION_BIT;
+    }
     m_millies_at_last_change = current_time;
     m_state_flags &= ~SWITCH_H_DURATION_CAP_BIT; // remove DURATION CAP flag
     }
@@ -75,6 +85,7 @@ void Switch::processSignal(byte digital_readout) {
 
 }
 
+
 uint16_t Switch::getClosedDuration() {
   uint16_t duration;
   if(m_state_flags&SWITCH_H_STATE_BIT) { // is currently closed, so we use current time - last change
@@ -83,10 +94,13 @@ uint16_t Switch::getClosedDuration() {
       if(duration>DURATION_CAP) duration=DURATION_CAP ;
   } else { // is open, so we use stored duration value
       duration=m_last_duration;
-      duration<<=7;
+      if(m_state_flags&SWITCH_H_HIGH_RESOLUTION_DURATION_BIT)  duration<<=4;
+      else duration<<=7;
   }
   return duration;
 };
+
+
 
 uint16_t Switch::getOpenDuration() {
   uint16_t duration;
@@ -96,7 +110,8 @@ uint16_t Switch::getOpenDuration() {
       if(duration>DURATION_CAP) duration=DURATION_CAP ;
   } else { // is closed, so we use stored duration value from the previous open phase
       duration=m_last_duration;
-      duration<<=7;
+      if(m_state_flags&SWITCH_H_HIGH_RESOLUTION_DURATION_BIT)  duration<<=4;
+      else duration<<=7;
   }
   return duration;
 }

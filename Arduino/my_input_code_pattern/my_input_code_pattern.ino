@@ -56,7 +56,10 @@ void loop() {
 
   if(current_time-prev_dump_time>=DUMP_INTERVAL) {
     prev_dump_time=current_time;
-    Serial.print("Press Timer ");
+    Serial.print("Processor Time ");
+    uint16_t current_time=millis();
+    Serial.print(current_time);
+    Serial.print(" Press Timer ");
     for(byte k=0;k<KEY_COUNT;k++) {
       Serial.print(input_keyGetPressDuration( k));
       Serial.print(":");
