@@ -1,13 +1,15 @@
 /* Functions to handle all input elements */
 
 #include "mainSettings.h"
-
+#include "Switch.h"
 // Activate general trace output
 
 #ifdef TRACE_ON
 #define TRACE_INPUT 
 #define TRACE_INPUT_ENCODER
 #endif
+
+#define SHOW_KEYPRESS_ON_BUILTIN
 
 /******** Encoder configuration  ********/
 
@@ -20,7 +22,7 @@
 
 /********* Switch configuration *********/
 #define ENCODER_SWITCH_PIN 5
-byte keyboard_pin[]={6,7,8};
+byte input_keyboard_pin[]={6,7,8};
 #define KEYBOARD_BUTTON_COUNT 3
 
 /* *********** General state variables of the input module ************ */
@@ -46,7 +48,8 @@ bool input_encoder_change_event = false;
 
 /****** switch constants and variables ******/
 
-
+Switch input_encoderButton;
+Switch input_keyboardButton[KEYBOARD_BUTTON_COUNT];
 
 /* ***************************       S E T U P           ******************************
 */
@@ -55,8 +58,19 @@ void input_setup() {
 
 
   /* Initalize the encoder */
+  pinMode(ENCODER_CLOCK_PIN,INPUT);
+  pinMode(ENCODER_DIRECTION_PIN,INPUT);
   input_encoder_setRange(1, 20, 1, true); // Set Encoder to count from 1 to 20  as default (number of on turns in my test hardware) 
   attachInterrupt(digitalPinToInterrupt(ENCODER_CLOCK_PIN),encoder_clock_change_ISR,CHANGE);
+
+  /* Initialize the switches */
+  pinMode(ENCODER_SWITCH_PIN,INPUT_PULLUP);
+  input_encoderButton.configureCloseSignal(LOW); // this circuit has a pullup logic
+  for(byte s=0;s<KEYBOARD_BUTTON_COUNT;s++) {
+    pinMode(input_keyboard_pin[s],INPUT_PULLUP);
+    input_keyboardButton[s].configureCloseSignal(LOW); // pullup logic
+  }
+
 
 }
 
@@ -81,10 +95,48 @@ int input_getSecondsSinceLastEvent() {
 
 void input_scan_tick()
 {
-  if(input_encoder_scan() /*|| input_switch_scan()*/) input_last_event_time = millis(); // Reset the global age of interaction
+  if(input_encoder_scan() || input_switch_scan()) input_last_event_time = millis(); // Reset the global age of interaction
 
 } // input_scan_tick
 
+
+/* *************** switch scan ****************** */
+
+bool input_switch_scan() {
+  bool has_change=false;
+  #ifdef SHOW_KEYPRESS_ON_BUILTIN
+  byte press_tracer=0;
+  #endif
+
+  input_encoderButton.processSignal(digitalRead(ENCODER_SWITCH_PIN)); 
+  #ifdef SHOW_KEYPRESS_ON_BUILTIN
+    if(!digitalRead(ENCODER_SWITCH_PIN)) press_tracer++;
+  #endif
+
+  if(input_encoderButton.gotChanged()) has_change=true;
+  for(byte s=0;s<KEYBOARD_BUTTON_COUNT;s++){
+    input_keyboardButton[s].processSignal(digitalRead(input_keyboard_pin[s])); 
+    if(input_keyboardButton[s].gotChanged()) has_change=true;
+    #ifdef SHOW_KEYPRESS_ON_BUILTIN
+      if(!digitalRead(input_keyboard_pin[s])) press_tracer++;
+    #endif
+  } 
+    #ifdef SHOW_KEYPRESS_ON_BUILTIN
+      if(press_tracer) digitalWrite(LED_BUILTIN,HIGH);
+      else digitalWrite(LED_BUILTIN,LOW);
+    #endif
+  //Serial.println("");
+  return has_change;
+}
+
+
+/* ************* switch state functions *************** */
+/* This will be adapted to the usecase for better clarity in the functional code */
+
+bool input_keyGotPressed(byte k) { return input_keyboardButton[k].gotClosed(); };
+bool input_keyIsPressed(byte k) { return input_keyboardButton[k].isClosed(); };
+bool input_keyGotReleased(byte k) { return input_keyboardButton[k].gotOpened(); };
+bool input_keyIsReleased(byte k) { return input_keyboardButton[k].isOpen(); };
 
 /* ***************** Encoder state functions ************************* */
 

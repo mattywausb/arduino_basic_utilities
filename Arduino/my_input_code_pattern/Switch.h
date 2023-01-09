@@ -4,6 +4,7 @@
 /*
 *  Class to provide essential digital switch handling. HIGH/LOW Signal capture must be done externally, so you have the full choice how to get the signal
 *  Main features: debounce logic, duration tracking, event isolation
+*  Memory footprint: 4 Bytes per switch
 *
 *  To save memory, the time resolution and boundaries are as follows
 *  duration is stored in 8 bit with a resoluition of 128ms (that would be more then enough for user interfaces) what results in a range of 0 to 32.783ms 
@@ -27,6 +28,7 @@ class Switch
     bool gotClosed() { return (m_state_flags&SWITCH_H_CHANGE_CHECK_MASK)==SWITCH_H_CHANGE_CHECK_MASK;}; // true, when switch changed to closed state on last scan
     bool isOpen() { return ! m_state_flags&SWITCH_H_STATE_BIT;};
     bool gotOpened() { return (m_state_flags&SWITCH_H_CHANGE_CHECK_MASK)==SWITCH_H_CHANGE_BIT;}; // true, when switch changed to open state on last scan
+    bool gotChanged() { return m_state_flags&SWITCH_H_CHANGE_BIT;};
     uint16_t getCloseDuration(); // duration of the current or last close phase
     uint16_t getOpenDuration(); // duration of the current or last open phase
 

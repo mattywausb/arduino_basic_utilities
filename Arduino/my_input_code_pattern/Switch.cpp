@@ -1,5 +1,11 @@
- #include "Arduino.h"
- #include "Switch.h"
+#include "mainSettings.h"
+#include "Arduino.h"
+#include "Switch.h"
+
+#ifdef TRACE_ON
+    #define TRACE_SWITCH_CHANGE
+#endif
+
 
 #define DEBOUNCE_INTERVAL 10
 #define DURATION_CAP 32000
@@ -25,13 +31,21 @@ void Switch::processSignal(byte digital_readout) {
   /* Manage state change */
   m_state_flags&=0xfd; // Remove change flag
 
+  //if(switch_is_closed)Serial.print("x"); else Serial.print(".");
+
   if(switch_is_closed) {
-    if(!m_state_flags&SWITCH_H_STATE_BIT  ) { //was open in previous scan
+    if(!(m_state_flags&SWITCH_H_STATE_BIT)  ) { //was open in previous scan
+      #ifdef TRACE_SWITCH_CHANGE
+        Serial.println(F("TRACE_SWITCH_CHANGE> switch got closed"));
+      #endif
         m_state_flags|=SWITCH_H_STATE_BIT  |SWITCH_H_CHANGE_BIT ; // Set change and state flag
       }
     } else  { // switch is open
     if(m_state_flags&SWITCH_H_STATE_BIT  ) { // was closed in previous scan
       if(current_time-m_millies_at_last_change<DEBOUNCE_INTERVAL) return; // Debounce first
+      #ifdef TRACE_SWITCH_CHANGE
+        Serial.println(F("TRACE_SWITCH_CHANGE> switch got opened after debounce"));
+      #endif
       m_state_flags=(m_state_flags&~SWITCH_H_STATE_BIT  )|SWITCH_H_CHANGE_BIT ; // clear state flag and set change  flag
     }
    }
@@ -41,17 +55,18 @@ void Switch::processSignal(byte digital_readout) {
   if(duration>DURATION_CAP) { 
     duration=DURATION_CAP ;
       m_state_flags|=SWITCH_H_DURATION_CAP_BIT; // Set the duration cap bit
+      #ifdef TRACE_SWITCH_DURATION
+        Serial.println(F("TRACE_SWITCH_DURATION> switch reached DURATION_CAP"));
+      #endif
   }
-}
 
-/*
   if(m_state_flags&SWITCH_H_CHANGE_BIT)  { // Change noticed
     m_last_duration = duration >> 7; //Shift by 7 bit = divide by 128 = reduce resolution to 128ms
     m_millies_at_last_change = current_time;
     m_state_flags &= ~SWITCH_H_DURATION_CAP_BIT; // remove DURATION CAP flag
     }
-    }
-    } */
+}
+    
 
   
 
