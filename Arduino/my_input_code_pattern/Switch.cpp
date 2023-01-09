@@ -3,16 +3,19 @@
 #include "Switch.h"
 
 #ifdef TRACE_ON
-    #define TRACE_SWITCH_CHANGE
+    //#define TRACE_SWITCH_CHANGE
 #endif
 
 
-#define DEBOUNCE_INTERVAL 10
+#define DEBOUNCE_INTERVAL 60
 #define DURATION_CAP 32000
 #define DURATION_CAP_UINT8 250
  
 Switch::Switch() {
    m_state_flags=SWITCH_H_DURATION_CAP_BIT;
+   #ifdef TRACE_FLAG_CHANGE
+    m_trace_prev_flags=m_state_flags;
+   #endif
    m_millies_at_last_change=0; 
    m_last_duration=DURATION_CAP_UINT8;
  }
@@ -30,8 +33,6 @@ void Switch::processSignal(byte digital_readout) {
 
   /* Manage state change */
   m_state_flags&=0xfd; // Remove change flag
-
-  //if(switch_is_closed)Serial.print("x"); else Serial.print(".");
 
   if(switch_is_closed) {
     if(!(m_state_flags&SWITCH_H_STATE_BIT)  ) { //was open in previous scan
@@ -65,6 +66,39 @@ void Switch::processSignal(byte digital_readout) {
     m_millies_at_last_change = current_time;
     m_state_flags &= ~SWITCH_H_DURATION_CAP_BIT; // remove DURATION CAP flag
     }
+  #ifdef TRACE_FLAG_CHANGE
+      if(m_trace_prev_flags^m_state_flags) {
+        Serial.print(F("TRACE_FLAG_CHANGE>new flags:  "));Serial.println(0x80|m_state_flags,BIN);
+        m_trace_prev_flags=m_state_flags;
+      }
+  #endif
+
+}
+
+uint16_t Switch::getClosedDuration() {
+  uint16_t duration;
+  if(m_state_flags&SWITCH_H_STATE_BIT) { // is currently closed, so we use current time - last change
+      uint16_t current_time=millis();
+      duration=(m_state_flags&SWITCH_H_DURATION_CAP_BIT)? DURATION_CAP : current_time-m_millies_at_last_change;
+      if(duration>DURATION_CAP) duration=DURATION_CAP ;
+  } else { // is open, so we use stored duration value
+      duration=m_last_duration;
+      duration<<=7;
+  }
+  return duration;
+};
+
+uint16_t Switch::getOpenDuration() {
+  uint16_t duration;
+  if(!(m_state_flags&SWITCH_H_STATE_BIT)) { // is currently open, so we use current time - last change
+      uint16_t current_time=millis();
+      duration=(m_state_flags&SWITCH_H_DURATION_CAP_BIT)? DURATION_CAP : current_time-m_millies_at_last_change;
+      if(duration>DURATION_CAP) duration=DURATION_CAP ;
+  } else { // is closed, so we use stored duration value from the previous open phase
+      duration=m_last_duration;
+      duration<<=7;
+  }
+  return duration;
 }
     
 

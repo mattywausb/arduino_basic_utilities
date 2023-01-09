@@ -3,6 +3,8 @@
 #define KEY_COUNT 3
 int press_counter[KEY_COUNT];
 int encoder_button_press_count=0;
+unsigned long prev_dump_time=0;
+#define DUMP_INTERVAL 2000
 
 
 void setup() {
@@ -49,6 +51,21 @@ void loop() {
       Serial.print("  ");
     }
     Serial.println();
+  }
+  unsigned long current_time = millis();
+
+  if(current_time-prev_dump_time>=DUMP_INTERVAL) {
+    prev_dump_time=current_time;
+    Serial.print("Press Timer ");
+    for(byte k=0;k<KEY_COUNT;k++) {
+      Serial.print(input_keyGetPressDuration( k));
+      Serial.print(":");
+      Serial.print(input_keyGetReleaseDuration( k));
+      Serial.print("   ");
+
+    }
+    Serial.println();
+
   }
 
 } // end of loop()

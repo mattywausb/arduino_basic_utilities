@@ -11,6 +11,11 @@
 *  Function scales the value to ms to stay in the general pattern
 */
 
+#ifdef TRACE_ON
+   // #define TRACE_FLAG_CHANGE
+#endif
+
+
 #define SWITCH_H_CHANGE_BIT  0x02
 #define SWITCH_H_STATE_BIT   0x01
 #define SWITCH_H_DURATION_CAP_BIT 0x04
@@ -29,13 +34,16 @@ class Switch
     bool isOpen() { return ! m_state_flags&SWITCH_H_STATE_BIT;};
     bool gotOpened() { return (m_state_flags&SWITCH_H_CHANGE_CHECK_MASK)==SWITCH_H_CHANGE_BIT;}; // true, when switch changed to open state on last scan
     bool gotChanged() { return m_state_flags&SWITCH_H_CHANGE_BIT;};
-    uint16_t getCloseDuration(); // duration of the current or last close phase
+    uint16_t getClosedDuration(); // duration of the current or last close phase
     uint16_t getOpenDuration(); // duration of the current or last open phase
 
   private:
     uint8_t m_last_duration;  // Last duration in 128ms 
     byte  m_state_flags;   // ---h-tsc   h=high_is_close, t=duration is capped at max of 30s, s=switch changed state to previous, c=current state
     uint16_t m_millies_at_last_change;  // last 16 bit of timestamp, when state changed
+  #ifdef TRACE_FLAG_CHANGE
+    uint8_t m_trace_prev_flags;
+  #endif
 };
 
 #endif

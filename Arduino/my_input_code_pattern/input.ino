@@ -105,12 +105,12 @@ void input_scan_tick()
 bool input_switch_scan() {
   bool has_change=false;
   #ifdef SHOW_KEYPRESS_ON_BUILTIN
-  byte press_tracer=0;
+  bool press_tracer=false;
   #endif
 
   input_encoderButton.processSignal(digitalRead(ENCODER_SWITCH_PIN)); 
   #ifdef SHOW_KEYPRESS_ON_BUILTIN
-    if(!digitalRead(ENCODER_SWITCH_PIN)) press_tracer++;
+    press_tracer|=input_encoderButton.isClosed();
   #endif
 
   if(input_encoderButton.gotChanged()) has_change=true;
@@ -118,7 +118,7 @@ bool input_switch_scan() {
     input_keyboardButton[s].processSignal(digitalRead(input_keyboard_pin[s])); 
     if(input_keyboardButton[s].gotChanged()) has_change=true;
     #ifdef SHOW_KEYPRESS_ON_BUILTIN
-      if(!digitalRead(input_keyboard_pin[s])) press_tracer++;
+      press_tracer|=input_keyboardButton[s].isClosed();
     #endif
   } 
     #ifdef SHOW_KEYPRESS_ON_BUILTIN
@@ -135,6 +135,8 @@ bool input_switch_scan() {
 
 bool input_keyGotPressed(byte k) { return input_keyboardButton[k].gotClosed(); };
 bool input_keyIsPressed(byte k) { return input_keyboardButton[k].isClosed(); };
+uint16_t input_keyGetPressDuration(byte k) { return input_keyboardButton[k].getClosedDuration(); };
+uint16_t input_keyGetReleaseDuration(byte k) { return input_keyboardButton[k].getOpenDuration(); };
 bool input_keyGotReleased(byte k) { return input_keyboardButton[k].gotOpened(); };
 bool input_keyIsReleased(byte k) { return input_keyboardButton[k].isOpen(); };
 
