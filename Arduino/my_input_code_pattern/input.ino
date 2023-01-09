@@ -16,7 +16,12 @@
 #define ENCODER_DIRECTION_PIN 4
 #define ENCODER_MAX_CHANGE_PER_TICK 100
 
-// Press function is managed as normal button
+// Press function is managed as normal switch
+
+/********* Switch configuration *********/
+#define ENCODER_SWITCH_PIN 5
+byte keyboard_pin[]={6,7,8};
+#define KEYBOARD_BUTTON_COUNT 3
 
 /* *********** General state variables of the input module ************ */
 unsigned long input_last_event_time = 0;
@@ -39,6 +44,7 @@ int input_encoder_stepSize = 1;
 bool input_encoder_wrap = true;
 bool input_encoder_change_event = false;
 
+/****** switch constants and variables ******/
 
 
 
@@ -75,7 +81,7 @@ int input_getSecondsSinceLastEvent() {
 
 void input_scan_tick()
 {
-  if(input_encoder_scan() /*|| input_button_scan()*/) input_last_event_time = millis(); // Reset the global age of interaction
+  if(input_encoder_scan() /*|| input_switch_scan()*/) input_last_event_time = millis(); // Reset the global age of interaction
 
 } // input_scan_tick
 
