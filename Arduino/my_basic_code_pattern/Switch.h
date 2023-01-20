@@ -2,12 +2,13 @@
 #define SWITCH_H
 
 /*
-*  Class to provide essential digital switch handling. HIGH/LOW Signal capture must be done externally, so you have the full choice how to get the signal
-*  Main features: debounce logic (wit configurable cooldown time), duration tracking, event isolation
-*  Memory footprint: 4 Bytes per switch (5 bytes when tracing flag changes)
+*  Class to provide essential digital switch handling. HIGH/LOW Signal capture must be done externally and then passed to processSignal method
+*  This way you have the full choice how to get the signal
+*  Main features: debounce logic (with configurable cooldown time), duration tracking, change event isolation
+*  Memory footprint: 4 Bytes per switch (5 bytes when tracing flag changes )
 *
 *  Duration is stored in 8+1 bit with a resolution of 16ms for up to 4080ms and 128ms for up to  32000ms 
-*  Reading functions scale the duratpion value to ms to stay in the general pattern
+*  Reading functions scale the duration value to ms, so it is compatible to the common time handling
 */
 
 #ifdef TRACE_ON
