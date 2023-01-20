@@ -2,6 +2,7 @@
 
 #include "mainSettings.h"
 #include "Switch.h"
+#include "Encoder.h"
 // Activate general trace output
 
 #ifdef TRACE_ON
@@ -16,7 +17,6 @@
 // CLOCK PIN must be handled by interrupt
 #define ENCODER_CLOCK_PIN 2
 #define ENCODER_DIRECTION_PIN 4
-#define ENCODER_MAX_CHANGE_PER_TICK 100
 
 // Press function is managed as normal switch
 
@@ -30,6 +30,8 @@ unsigned long input_last_event_time = 0;
 bool input_enabled=true;
 
 /******** Encoder constants and variables  ********/
+
+Encoder myEncoder;
 
 volatile bool encoder_prev_clock_state=HIGH;
 volatile bool encoder_direction_state_start=HIGH;
@@ -60,8 +62,11 @@ void input_setup() {
   /* Initalize the encoder */
   pinMode(ENCODER_CLOCK_PIN,INPUT);
   pinMode(ENCODER_DIRECTION_PIN,INPUT);
-  input_encoder_setRange(1, 20, 1, true); // Set Encoder to count from 1 to 20  as default (number of on turns in my test hardware) 
-  attachInterrupt(digitalPinToInterrupt(ENCODER_CLOCK_PIN),encoder_clock_change_ISR,CHANGE);
+  myEncoder.configureSignalmode(false);
+  myEncoder.configureRange(1, 20, 1, ENCODER_H_NO_WRAP);
+
+  // input_encoder_setRange(1, 20, 1, true); // Set Encoder to count from 1 to 20  as default (number of on turns in my test hardware) 
+  attachInterrupt(digitalPinToInterrupt(ENCODER_CLOCK_PIN),encoder_clock_change_ISR_obj,CHANGE);
 
   /* Initialize the switches */
   pinMode(ENCODER_SWITCH_PIN,INPUT_PULLUP);
@@ -95,7 +100,7 @@ int input_getSecondsSinceLastEvent() {
 
 void input_scan_tick()
 {
-  if(input_encoder_scan() || input_switch_scan()) input_last_event_time = millis(); // Reset the global age of interaction
+  if(input_encoder_scan_obj() || input_switch_scan()) input_last_event_time = millis(); // Reset the global age of interaction
 
 } // input_scan_tick
 
@@ -146,9 +151,17 @@ bool input_encoder_hasPendingChange() {
   return input_encoder_change_event;
 }
 
+bool input_encoder_hasPendingChange_obj() {  
+  return myEncoder.hasPendingChange();
+}
+
 int input_encoder_getValue() {
   input_encoder_change_event = false;
   return input_encoder_value;
+}
+
+int input_encoder_getValue_obj() {
+  return myEncoder.getValue();
 }
 
 /* **************** Encoder  Operations ***************** */
@@ -179,6 +192,10 @@ void input_encoder_setRange(int rangeMin, int rangeMax, int stepSize, bool wrap)
 }
 
 /* **************** Encoder  Scan functions ***************** */
+bool input_encoder_scan_obj()
+{
+  return myEncoder.processChange();
+}
 
 /* This must be called by the loop to update the encoder state */
 bool input_encoder_scan()
@@ -210,6 +227,11 @@ bool input_encoder_scan()
 
   return is_relevant_event;
 
+}
+
+
+void encoder_clock_change_ISR_obj() {
+  myEncoder.processSignal(digitalRead(ENCODER_CLOCK_PIN),digitalRead(ENCODER_DIRECTION_PIN));
 }
 
 /* This is the encoders interrupt function */

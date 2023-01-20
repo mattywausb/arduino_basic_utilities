@@ -1,7 +1,7 @@
 #ifndef SWITCH_H
 #define SWITCH_H
 
-/*
+/*!
 *  Class to provide essential digital switch handling. HIGH/LOW Signal capture must be done externally and then passed to processSignal method
 *  This way you have the full choice how to get the signal
 *  Main features: debounce logic (with configurable cooldown time), duration tracking, change event isolation

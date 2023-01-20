@@ -6,31 +6,38 @@
   #define TRACE_ENCODER
 #endif
 
-void Encoder::Encoder() {
 
+/* *** */
+Encoder::Encoder() {
+ return;
 }
 
-void  Encoder::configureCloseSignal(bool high_is_close)
+
+/* *** */
+void  Encoder::configureSignalmode(bool high_is_close)
 {
   if(high_is_close) m_process_flags|=ENCODER_H_HIGH_IS_CLOSE_BIT;
   else m_process_flags&= ~ENCODER_H_HIGH_IS_CLOSE_BIT;
 };
 
-int Encoder::configureRange(int rangeMin, int rangeMax, int stepSize, byte wrap_mode)
+
+/* *** */
+int16_t Encoder::configureRange(int16_t rangeMin, int16_t rangeMax, int16_t stepSize, byte wrap_mode)
 {
   m_rangeMin = min(rangeMin, rangeMax);
   m_rangeMax = max(rangeMin, rangeMax);
-  m_process_flags = (input_encoder_wrap & ~ENCODER_H_WRAP_CLIPPED) | wrap_mode;
+  m_process_flags = (m_process_flags & ~ENCODER_H_WRAP_CLIPPED) | wrap_mode;
   m_stepSize = stepSize;
-  setValue(m_value_value); //this will check the value and place it in the new range
+  setValue(m_value); //this will check the value and place it in the new range
   #ifdef TRACE_ENCODER
     Serial.print(F("TRACE_ENCODER configureRange:"));
     Serial.print(m_rangeMin); Serial.print(F("-"));
     Serial.print(m_rangeMax); Serial.print(F(" Step "));
     Serial.print(m_stepSize); Serial.print(F(" Wrap "));
-    Serial.println(input_encoder_wrap & ENCODER_H_WRAP_CLIPPED, BIN);
+    Serial.println(m_process_flags & ENCODER_H_WRAP_CLIPPED, BIN);
   #endif
 }
+
 
  /* evaluate the signal and track the change counter  accordingly (This must be called by the ISR )*/
 void Encoder::processSignal(byte clock_signal, byte direction_signal) //  evaluates the signal and tracks the change counter  accordingly
@@ -54,8 +61,7 @@ void Encoder::processSignal(byte clock_signal, byte direction_signal) //  evalua
   }
 
   if((m_prev_signal_state&ENCODER_H_CLOCK_BIT) && !clock_signal) { //clock got opened 
-      bool encoder_direction_state_end=direction_signal;  
-      encoder_prev_clock_state=clock_signal;
+
       if(m_prev_signal_state&ENCODER_H_DIRECTION_BIT) { // direction was closed on clock close
         if (!direction_signal) { // and now it is open = encoder turned counter clockwise 
           m_change_amount-=1;
@@ -71,7 +77,8 @@ void Encoder::processSignal(byte clock_signal, byte direction_signal) //  evalua
 }
 
 
-bool Encoder::processChange(); // this evaluates the signal and updates states accordingly. returns true on changes so caller can track change timing
+/* *** */
+bool Encoder::processChange(){ 
   bool is_relevant_event=false;
   
   /* transfer high resolution encoder movement into tick encoder value */
@@ -86,13 +93,13 @@ bool Encoder::processChange(); // this evaluates the signal and updates states a
       m_process_flags |= ENCODER_H_PENDING_CHANGE_BIT;
       is_relevant_event=true;
     }
-    m_change_amount -= tick_encoder_change_value; // remove the transfered value from the tracking
+    m_change_amount -= tick_encoder_change_value; // remove the processed value from the tracking
     #ifdef TRACE_INPUT_ENCODER
         Serial.print(F("TRACE_ENCODER processChange:"));
         Serial.print(F(" m_signal_call_count=")); Serial.print(m_signal_call_count);
         Serial.print(F("\ttick_encoder_change_value=")); Serial.print(tick_encoder_change_value);
-        Serial.print(F("\m_value=")); Serial.print(m_value);
-        Serial.print(F("\m_change_amount left=")); Serial.println(m_change_amount);
+        Serial.print(F("\tm_value=")); Serial.print(m_value);
+        Serial.print(F("\tm_change_amount left=")); Serial.println(m_change_amount);
         m_signal_call_count=0;
     #endif
   }
@@ -100,6 +107,20 @@ bool Encoder::processChange(); // this evaluates the signal and updates states a
   return is_relevant_event;
 }
 
-int setValue(int /*newValue*/); // set the current value (whithin the defined bounds)
-int setRange(int /*rangeMin*/, int /*rangeMax*/, int /*stepSize*/, byte /*wrap_mode*/); // Set the range bounds, stepping and wrap behaviour
-int getValue(); // calling get value will reset "pendingChangeFlag"
+
+/* *** */
+int16_t Encoder::setValue(int16_t newValue) { // set the current value (whithin the defined bounds)
+ m_value = newValue;
+  if (m_value < m_rangeMin) m_value = m_rangeMin;
+  if (m_value > m_rangeMax) m_value = m_rangeMax;
+  m_process_flags &= ~ENCODER_H_PENDING_CHANGE_BIT;
+  m_change_amount=0;
+  return m_value;
+}
+
+
+/* *** */
+int16_t Encoder::getValue() {
+  m_process_flags &= ~ENCODER_H_PENDING_CHANGE_BIT;
+  return m_value;
+}; // calling get value will reset "pendingChangeFlag"
