@@ -1,14 +1,8 @@
-# encoder_how_to
-Small arduino project to elaborate the "ultimate" encoder reading and switch handling
-
-
-# Motivation
-I was still struggling with the best kind of reading encoder input.
-* dont miss a step
-* dont duplicate steps
-* some comfort for using the input in the final code
-
-Also my code for handling button/switch input was a mess. So in this small project I try out some patterns and save it for future projects.
+# arduino_basic_utilities
+Small arduino project to keep my best practices in arduino coding.
+* main loop and operation mode coding pattern
+* handling input (switches, encoders)
+* providing output (blinkpattern, neopixels, sound melodies)
 
 It is not a library but more a source of approved code to copy into upcoming projects.
 
