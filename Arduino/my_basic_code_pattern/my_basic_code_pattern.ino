@@ -31,9 +31,16 @@ void setup() {
 } // end of setup()
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  input_scan_tick();
   bool input_event_happened=false;
+
+  input_scan_tick();
+
+  // Enable/Disable encoder tracking  
+  if(input_encoder_gotPressed()) {
+      encoder_button_press_count++;
+      if(encoder_button_press_count%2) input_encoder_disable();
+      else input_encoder_enable();
+  }
 
   // Evaluate keyboard input
   for(byte k=0;k<KEY_COUNT;k++) {

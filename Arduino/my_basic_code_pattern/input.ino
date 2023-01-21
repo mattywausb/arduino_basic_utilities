@@ -62,14 +62,12 @@ void input_setup() {
   /* Initalize the encoder */
   pinMode(ENCODER_CLOCK_PIN,INPUT);
   pinMode(ENCODER_DIRECTION_PIN,INPUT);
-  myEncoder.configureSignalmode(false);  // We have a pullup circuit. So a falling flank initiates the turn
-  myEncoder.configureRange(0, 19, 1, ENCODER_H_NO_WRAP);
-  myEncoder.setValue(10);
+  myEncoder.configureCloseSignal(LOW);  // We have a pullup circuit. So a falling flank initiates the turn
+  myEncoder.configureRange(4, 83, 4, ENCODER_H_WRAP);
+  myEncoder.setValue(12);
 
-  input_encoder_setRange(0, 19, 1, true); // Set Encoder to count from 1 to 20  as default (number of on turns in my test hardware) 
   
-  attachInterrupt(digitalPinToInterrupt(ENCODER_CLOCK_PIN),encoder_clock_change_ISR_obj,CHANGE);
-  //attachInterrupt(digitalPinToInterrupt(ENCODER_CLOCK_PIN),encoder_clock_change_ISR,CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ENCODER_CLOCK_PIN),encoder_clock_change_ISR,CHANGE);
 
   /* Initialize the switches */
   pinMode(ENCODER_SWITCH_PIN,INPUT_PULLUP);
@@ -103,10 +101,66 @@ int input_getSecondsSinceLastEvent() {
 
 void input_scan_tick()
 {
-  if(input_encoder_scan_obj() || input_switch_scan()) input_last_event_time = millis(); // Reset the global age of interaction
+  if(myEncoder.processChange() || input_switch_scan()) input_last_event_time = millis(); // Reset the global age of interaction
 
 } // input_scan_tick
 
+
+
+
+/* ************* switch state functions *************** */
+/* This will be adapted to the usecase for better clarity in the functional code */
+
+bool input_keyGotPressed(byte k) { return input_keyboardButton[k].gotClosed(); };
+bool input_keyIsPressed(byte k) { return input_keyboardButton[k].isClosed(); };
+uint16_t input_keyGetPressDuration(byte k) { return input_keyboardButton[k].getClosedDuration(); };
+uint16_t input_keyGetReleaseDuration(byte k) { return input_keyboardButton[k].getOpenDuration(); };
+bool input_keyGotReleased(byte k) { return input_keyboardButton[k].gotOpened(); };
+bool input_keyIsReleased(byte k) { return input_keyboardButton[k].isOpen(); };
+
+/* ***************** Encoder state functions ************************* */
+
+bool input_encoder_gotPressed() {
+  return input_encoderButton.gotClosed();
+}
+
+bool input_encoder_isPressed() {
+  return input_encoderButton.isClosed();
+}
+
+bool input_encoder_gotReleased() {
+  return input_encoderButton.gotOpened();
+}
+
+bool input_encoder_isReleased() {
+  return input_encoderButton.isOpen();
+}
+
+bool input_encoder_hasPendingChange() {  
+  return myEncoder.hasPendingChange();
+}
+
+int input_encoder_getValue() {
+  return myEncoder.getValue();
+}
+
+int input_encoder_setValue(int newValue) {
+  return myEncoder.setValue(newValue);
+}
+
+int input_encoder_enable() {
+  myEncoder.enable();
+}
+
+int input_encoder_disable() {
+  myEncoder.disable();
+}
+
+/* ***********  Encoder tracking function **************** */
+
+void encoder_clock_change_ISR() {
+  myEncoder.processSignal(digitalRead(ENCODER_CLOCK_PIN),digitalRead(ENCODER_DIRECTION_PIN));
+}
 
 /* *************** switch scan ****************** */
 
@@ -129,153 +183,12 @@ bool input_switch_scan() {
       press_tracer|=input_keyboardButton[s].isClosed();
     #endif
   } 
-    #ifdef SHOW_KEYPRESS_ON_BUILTIN
-      if(press_tracer) digitalWrite(LED_BUILTIN,HIGH);
-      else digitalWrite(LED_BUILTIN,LOW);
-    #endif
-  //Serial.println("");
+  #ifdef SHOW_KEYPRESS_ON_BUILTIN
+    if(press_tracer) digitalWrite(LED_BUILTIN,HIGH);
+    else digitalWrite(LED_BUILTIN,LOW);
+  #endif
   return has_change;
 }
-
-
-/* ************* switch state functions *************** */
-/* This will be adapted to the usecase for better clarity in the functional code */
-
-bool input_keyGotPressed(byte k) { return input_keyboardButton[k].gotClosed(); };
-bool input_keyIsPressed(byte k) { return input_keyboardButton[k].isClosed(); };
-uint16_t input_keyGetPressDuration(byte k) { return input_keyboardButton[k].getClosedDuration(); };
-uint16_t input_keyGetReleaseDuration(byte k) { return input_keyboardButton[k].getOpenDuration(); };
-bool input_keyGotReleased(byte k) { return input_keyboardButton[k].gotOpened(); };
-bool input_keyIsReleased(byte k) { return input_keyboardButton[k].isOpen(); };
-
-/* ***************** Encoder state functions ************************* */
-
-bool input_encoder_hasPendingChange() {  
-  return input_encoder_change_event;
-}
-
-bool input_encoder_hasPendingChange_obj() {  
-  return myEncoder.hasPendingChange();
-}
-
-int input_encoder_getValue() {
-  input_encoder_change_event = false;
-  return input_encoder_value;
-}
-
-int input_encoder_getValue_obj() {
-  return myEncoder.getValue();
-}
-
-/* **************** Encoder  Operations ***************** */
-
-/* Set the current value of the encoder. Will be placed into the valid range, when out of bounds */
-void input_encoder_setValue(int newValue) {
-  input_encoder_value = newValue;
-  if (input_encoder_value < input_encoder_rangeMin) input_encoder_value = input_encoder_rangeMin;
-  if (input_encoder_value > input_encoder_rangeMax) input_encoder_value = input_encoder_rangeMax;
-  input_encoder_change_event = false;
-}
-
-/* Set the value range and step size for the encoder, including the option to wrap or not */
-void input_encoder_setRange(int rangeMin, int rangeMax, int stepSize, bool wrap) {
-  input_encoder_rangeMin = min(rangeMin, rangeMax);
-  input_encoder_rangeMax = max(rangeMin, rangeMax);
-  input_encoder_rangeShiftValue=input_encoder_rangeMax-input_encoder_rangeMin+1;
-  input_encoder_wrap = wrap;
-  input_encoder_stepSize = stepSize;
-  input_encoder_setValue(input_encoder_value);
-  #ifdef TRACE_INPUT
-    Serial.print(F("TRACE_INPUT input_encoder_setRange:"));
-    Serial.print(rangeMin); Serial.print(F("-"));
-    Serial.print(rangeMax); Serial.print(F(" Step "));
-    Serial.print(stepSize); Serial.print(F(" Wrap "));
-    Serial.println(wrap, BIN);
-  #endif
-}
-
-/* **************** Encoder  Scan functions ***************** */
-bool input_encoder_scan_obj()
-{
-  return myEncoder.processChange();
-}
-
-/* This must be called by the loop to update the encoder state */
-bool input_encoder_scan()
-{
-  bool is_relevant_event=false;
-  
-  /* transfer high resolution encoder movement into tick encoder value */
-  int8_t tick_encoder_change_value = encoder_change_value;  // Freeze the value for upcoming operations
-  if (tick_encoder_change_value) { // there are accumulated changes
-    if(input_enabled && tick_encoder_change_value<ENCODER_MAX_CHANGE_PER_TICK && tick_encoder_change_value>-ENCODER_MAX_CHANGE_PER_TICK)   {
-      input_encoder_value += tick_encoder_change_value * input_encoder_stepSize;
-      // Wrap or limit the encoder value 
-      while (input_encoder_value > input_encoder_rangeMax) input_encoder_value = input_encoder_wrap ? input_encoder_value-input_encoder_rangeShiftValue : input_encoder_rangeMax;
-      while (input_encoder_value < input_encoder_rangeMin) input_encoder_value = input_encoder_wrap ? input_encoder_value+input_encoder_rangeShiftValue : input_encoder_rangeMin;
-
-      input_encoder_change_event = true;
-      is_relevant_event=true;
-    }
-    encoder_change_value -= tick_encoder_change_value; // remove the transfered value from the tracking
-    #ifdef TRACE_INPUT_ENCODER
-        Serial.print(F("TRACE_INPUT_ENCODER input_switches_scan_tick:"));
-        Serial.print(F(" isr_call_count=")); Serial.print(isr_call_count);
-        Serial.print(F("\ttick_encoder_change_value=")); Serial.print(tick_encoder_change_value);
-        Serial.print(F("\tinput_encoder_value=")); Serial.print(input_encoder_value);
-        Serial.print(F("\tencoder_change_value left=")); Serial.println(encoder_change_value);
-        isr_call_count=0;
-    #endif
-  }
-
-  return is_relevant_event;
-
-}
-
-
-void encoder_clock_change_ISR_obj() {
-  bool direction_state=digitalRead(ENCODER_DIRECTION_PIN);
-  bool clock_state=digitalRead(ENCODER_CLOCK_PIN); 
-  myEncoder.processSignal(clock_state,direction_state);
-}
-
-/* This is the encoders interrupt function */
-// Todo: provide option to use PULL UP or PULL DOWN version
-void encoder_clock_change_ISR()
-{
-  bool direction_state=digitalRead(ENCODER_DIRECTION_PIN);
-  bool clock_state=digitalRead(ENCODER_CLOCK_PIN);  
-
-  #ifdef TRACE_INPUT_ENCODER
-    isr_call_count++;
-  #endif
-  #ifdef INPUT_FEEDBACK_ON_LED_BUILTIN
-    digitalWrite(LED_BUILTIN, !clock_state);
-  #endif
-
-  if(encoder_prev_clock_state && !clock_state) { //clock changes from 1 to 0 (start of cycle in PULL UP logic)
-      encoder_direction_state_start=direction_state;  
-      encoder_prev_clock_state=clock_state;
-      return;
-  }
-
-  if(!encoder_prev_clock_state && clock_state) { //clock changes from 1 to 0 (end of cycle PULL UP logic)
-      bool encoder_direction_state_end=direction_state;  
-      encoder_prev_clock_state=clock_state;
-      if(!encoder_direction_state_start) {
-        if (encoder_direction_state_end) { // turned counter clockwise 
-          encoder_change_value-=1;
-        }
-      } else { 
-        if(!encoder_direction_state_end) { // turned  clockwise
-          encoder_change_value+=1;
-        }
-      }
-      encoder_direction_state_start=encoder_direction_state_end;
-  }
-}      
-
-
 
 
 

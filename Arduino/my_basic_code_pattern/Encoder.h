@@ -9,7 +9,7 @@
 
 #ifdef TRACE_ON
    #define ENCODER_H_TRACE
-   //#define ENCODER_H_TRACE_CHANGE_HIGH
+ //  #define ENCODER_H_TRACE_CHANGE_HIGH
 #endif
 
 
@@ -39,10 +39,11 @@ class Encoder
     Encoder();
 
     /*!
-      Define the HIGH/LOW meaning of a signal (depends if state is detected in PULLDOWN oder PULLUP logic)
+      Define what signal (HIGH/LOW) will represent the closed state of the switch. This depends of state is detected in PULLDOWN oder PULLUP logic)
+      Setting this wrong will result in an "undetected step" at start and every time you change direction
       @param bool high_is_close bool: if true, the HIGH signal is equal to a closed contact
     */
-    void configureSignalmode(bool high_is_close);
+    void configureCloseSignal(bool high_is_close);
 
     /*!
       Set range of values, stepsize and wrap behaviour
@@ -50,11 +51,11 @@ class Encoder
       @param rangeMax int16_t: Defines the highst value 
       @param stepSize int16_t: Value change for every encoder step 
       @param wrap_mode byte: Bitflags defining the wrapping behaviour, when the value reaches the border
-                        If Bit is set, when reaching the border the value will wrap to the opposite border
+                        If bit is set, when reaching the border the value will wrap to the opposite border
                         ENCODER_H_WRAP_AT_MAX_BIT, ENCODER_H_WRAP_AT_MIN_BIT, ENCODER_H_WRAP = MIN and MAX Wrap
                         If Clipping is set, the Wrap will start exactliy with the border value, regardles of more steps
                         ENCODER_H_CLIP_ON_MAX_WRAP_BIT,ENCODER_H_CLIP_ON_MIN_WRAP_BIT, ENCODER_H_WRAP_CLIPPED
-       @return int16_t: the current value, wich might have been adjustet to be in the defined borders
+      @return int16_t: the current value, which might have been adjustet to be in the defined borders
     */
     int16_t configureRange(int16_t rangeMin, int16_t rangeMax, int16_t stepSize, byte wrap_mode); 
 
@@ -66,20 +67,20 @@ class Encoder
     void processSignal(byte clock_readout, byte direction_readout); 
 
     /*!
-      Process all changes collected by processSignal and updates the internal state accordingly. Must be called regulary by loop 
-      @return bool: true if there was a value change. Might be used for overall tracking of user input change time
+      Process all changes collected by processSignal and update the internal state accordingly. Must be called regulary by loop 
+      @return bool: true if there was a value change. (useful for overall tracking of user input change times)
     */
     bool processChange(); // this evaluates the signal and updates states accordingly
 
     /*!
       Enable the processing of changes
     */
-    void enable() { m_process_flags|=ENCODER_H_ENABLE_BIT;};   
+    void enable() { m_process_flags |= ENCODER_H_ENABLE_BIT;};   
 
     /*!
       Disable the processing of changes. This will discard further incoming signals until enable is called again.
     */
-    void disable(){ m_process_flags&= ~ENCODER_H_ENABLE_BIT;}; 
+    void disable(){ m_process_flags &= ~ENCODER_H_ENABLE_BIT;}; 
 
     /*!
       Set the current value of the encoder. This will discard any pending changes. The value will be corrected to 
@@ -87,7 +88,7 @@ class Encoder
       @param newValue int: the new value
       @return int the final value stored
     */
-    int16_t setValue(int16_t /*newValue*/); // set the current value (whithin the defined bounds)
+    int16_t setValue(int16_t newValue); // set the current value (whithin the defined bounds)
 
     /*!
       Get the current value. This will also reset the change flag

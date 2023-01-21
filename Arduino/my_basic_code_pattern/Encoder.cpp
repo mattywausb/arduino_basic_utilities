@@ -20,7 +20,7 @@ Encoder::Encoder() {
 /* ******* API ************* */
 
 /* *** */
-void  Encoder::configureSignalmode(bool high_is_close)
+void  Encoder::configureCloseSignal(bool high_is_close)
 {
   if(high_is_close) m_process_flags|=ENCODER_H_HIGH_IS_CLOSE_BIT;
   else m_process_flags&= ~ENCODER_H_HIGH_IS_CLOSE_BIT;
@@ -30,20 +30,23 @@ void  Encoder::configureSignalmode(bool high_is_close)
 /* *** */
 int16_t Encoder::configureRange(int16_t rangeMin, int16_t rangeMax, int16_t stepSize, byte wrap_mode)
 {
+  #ifdef ENCODER_H_TRACE
+    Serial.print(F("TRACE_ENCODER configureRange("));
+    Serial.print(rangeMin); Serial.print(F(","));
+    Serial.print(rangeMax); Serial.print(F(") f="));
+    Serial.println(0x0100|m_process_flags , BIN);
+  #endif
   m_rangeMin = min(rangeMin, rangeMax);
   m_rangeMax = max(rangeMin, rangeMax);
   m_process_flags = (m_process_flags & ~ENCODER_H_WRAP_CLIPPED) | wrap_mode;
   m_stepSize = stepSize;
-  setValue(m_value); //this will check the value and place it in the new range
   #ifdef ENCODER_H_TRACE
-    Serial.print(F("TRACE_ENCODER configureRange("));
-    Serial.print(rangeMin); Serial.print(F(","));
-    Serial.print(rangeMax); Serial.print(F(")"));
-    Serial.print(m_rangeMin); Serial.print(F("-"));
-    Serial.print(m_rangeMax); Serial.print(F(" Step "));
-    Serial.print(m_stepSize); Serial.print(F(" Wrap "));
-    Serial.println(m_process_flags & ENCODER_H_WRAP_CLIPPED, BIN);
+    Serial.print(F("\tmin="));Serial.print(m_rangeMin); 
+    Serial.print(F("\tmax="));Serial.print(m_rangeMax); 
+    Serial.print(F("\tstep=")); Serial.print(m_stepSize);
+    Serial.print(F("\tf'="));Serial.println(0x0100|m_process_flags , BIN);
   #endif
+  setValue(m_value); //this will check the value and place it in the new range
 }
 
 /* *** */
@@ -75,9 +78,9 @@ int16_t Encoder::getValue() {
  /* evaluate the signal and track the change counter  accordingly (This must be called by the ISR )*/
 void Encoder::processSignal(byte clock_signal, byte direction_signal) //  evaluates the signal and tracks the change counter  accordingly
 {
-  if(!(m_process_flags&ENCODER_H_HIGH_IS_CLOSE_BIT)) {  // Flip signal to HIGH is closed logic
-    clock_signal!=clock_signal;
-    direction_signal!=direction_signal;
+  if(!(m_process_flags&ENCODER_H_HIGH_IS_CLOSE_BIT)) {  // LOW is Closed, so invert incoming signal
+    clock_signal= !clock_signal;
+    direction_signal= !direction_signal;
   }
 
   #ifdef ENCODER_H_TRACE
@@ -88,7 +91,7 @@ void Encoder::processSignal(byte clock_signal, byte direction_signal) //  evalua
         digitalWrite(LED_BUILTIN, clock_signal);
   #endif
 
-  if(!(m_prev_signal_state&ENCODER_H_CLOCK_BIT) && clock_signal) { //clock got closed
+  if(((m_prev_signal_state&ENCODER_H_CLOCK_BIT)==0) && clock_signal) { //clock got closed
       if(direction_signal) m_prev_signal_state = ENCODER_H_DIRECTION_BIT|ENCODER_H_CLOCK_BIT;  
       else  m_prev_signal_state = ENCODER_H_CLOCK_BIT;
       return;
@@ -121,15 +124,17 @@ bool Encoder::processChange(){
   int8_t tick_encoder_change_value = m_change_amount;  // Freeze the value for upcoming operations
   #ifdef ENCODER_H_TRACE_CHANGE_HIGH
     Serial.print(F("TRACE_ENCODER_CHANGE_HIGH:"));
-    Serial.print(F("tick_encoder_change_value=")); Serial.println(tick_encoder_change_value);
+    Serial.print(F("v=")); Serial.print(tick_encoder_change_value);
+    Serial.print(F("\tf=")); Serial.print(0x0100|m_process_flags,BIN);
+    Serial.print(F("\ts=")); Serial.println(0x80|m_prev_signal_state,BIN);
   #endif
 
   if (tick_encoder_change_value) { // there are accumulated changes
-    if(m_process_flags&ENCODER_H_ENABLE_BIT && tick_encoder_change_value<ENCODER_MAX_CHANGE_PER_TICK && tick_encoder_change_value>-ENCODER_MAX_CHANGE_PER_TICK)   {
+    if((m_process_flags&ENCODER_H_ENABLE_BIT) && tick_encoder_change_value<ENCODER_MAX_CHANGE_PER_TICK && tick_encoder_change_value>-ENCODER_MAX_CHANGE_PER_TICK)   {
       m_value += tick_encoder_change_value * m_stepSize;
       // Wrap or limit the encoder value 
-      while (m_value > m_rangeMax) m_value = (m_process_flags&ENCODER_H_WRAP_AT_MAX_BIT) ? (m_process_flags&ENCODER_H_CLIP_ON_MAX_WRAP_BIT) ? m_rangeMin: m_value-(m_rangeMax-m_rangeMin) : m_rangeMax;
-      while (m_value < m_rangeMin) m_value = (m_process_flags&ENCODER_H_WRAP_AT_MIN_BIT) ? (m_process_flags&ENCODER_H_CLIP_ON_MIN_WRAP_BIT) ? m_rangeMax: m_value+(m_rangeMax-m_rangeMin) : m_rangeMin;
+      while (m_value > m_rangeMax) m_value = (m_process_flags&ENCODER_H_WRAP_AT_MAX_BIT) ? (m_process_flags&ENCODER_H_CLIP_ON_MAX_WRAP_BIT) ? m_rangeMin: m_value-(m_rangeMax-m_rangeMin+1) : m_rangeMax;
+      while (m_value < m_rangeMin) m_value = (m_process_flags&ENCODER_H_WRAP_AT_MIN_BIT) ? (m_process_flags&ENCODER_H_CLIP_ON_MIN_WRAP_BIT) ? m_rangeMax: m_value+(m_rangeMax-m_rangeMin+1) : m_rangeMin;
 
       m_process_flags |= ENCODER_H_PENDING_CHANGE_BIT;
       is_relevant_event=true;
@@ -137,8 +142,8 @@ bool Encoder::processChange(){
  
     m_change_amount -= tick_encoder_change_value; // remove the processed value from the tracking
     #ifdef ENCODER_H_TRACE
-        Serial.print(F("TRACE_ENCODER processChange:"));
-        Serial.print(F(" m_signal_call_count=")); Serial.print(m_signal_call_count);
+        Serial.print(F("TRACE_ENCODER processChange: f'="));Serial.print(0x0100|m_process_flags , BIN);
+        Serial.print(F("\tm_signal_call_count=")); Serial.print(m_signal_call_count);
         Serial.print(F("\ttick_encoder_change_value=")); Serial.print(tick_encoder_change_value);
         Serial.print(F("\tm_value=")); Serial.print(m_value);
         Serial.print(F("\tm_change_amount left=")); Serial.println(m_change_amount);
