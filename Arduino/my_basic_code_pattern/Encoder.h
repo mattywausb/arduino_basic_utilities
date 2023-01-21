@@ -1,7 +1,7 @@
 #ifndef ENCODER_H
 #define ENCODER_H
 
-/*!
+/*
 *  Class to provide essential encoder  handling. Capture of CLOCK and DIRECTION signal  must be done externally via ISR and then passed to processSignal method
 *  Main features: Manage value to be in e specifig range. Step size of the value. Multiple wrap around configurations
 *  Memory footprint: 10 bytes
@@ -30,6 +30,11 @@
 
 #define ENCODER_MAX_CHANGE_PER_TICK 100
 
+/*!
+*  Class to provide essential encoder  handling. Capture of CLOCK and DIRECTION signal  must be done externally via ISR and then passed to processSignal method
+*  Main features: Manage value to be in e specifig range. Step size of the value. Multiple wrap around configurations
+*  Memory footprint: 10 bytes
+*/
 class Encoder 
 {
   public:
@@ -39,7 +44,8 @@ class Encoder
     Encoder();
 
     /*!
-      Define what signal (HIGH/LOW) will represent the closed state of the switch. This depends of state is detected in PULLDOWN oder PULLUP logic)
+      Define what signal (HIGH/LOW) will represent the closed state of the switch. 
+      Depends if the pin is connected in a "PULLDOWN"(HIGH=CLOSE) or PULLUP (DOWN=CLOSE) circuit to the switch.
       Setting this wrong will result in an "undetected step" at start and every time you change direction
       @param bool high_is_close bool: if true, the HIGH signal is equal to a closed contact
     */

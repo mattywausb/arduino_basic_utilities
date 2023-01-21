@@ -27,26 +27,11 @@ byte input_keyboard_pin[]={6,7,8};
 
 /* *********** General state variables of the input module ************ */
 unsigned long input_last_event_time = 0;
-bool input_enabled=true;
+bool input_ignore_until_release_flag=true;
 
-/******** Encoder constants and variables  ********/
+/******** Encoder variables  ********/
 
 Encoder myEncoder;
-
-volatile bool encoder_prev_clock_state=HIGH;
-volatile bool encoder_direction_state_start=HIGH;
-volatile int8_t encoder_change_value = 0;
-#ifdef TRACE_INPUT_ENCODER
-  volatile byte isr_call_count=0;
-#endif 
-
-int input_encoder_value = 0;
-int input_encoder_rangeMin = 0;
-int input_encoder_rangeMax = 719;
-int input_encoder_rangeShiftValue=input_encoder_rangeMax-input_encoder_rangeMin+1;
-int input_encoder_stepSize = 1;
-bool input_encoder_wrap = true;
-bool input_encoder_change_event = false;
 
 /****** switch constants and variables ******/
 
@@ -63,7 +48,7 @@ void input_setup() {
   pinMode(ENCODER_CLOCK_PIN,INPUT);
   pinMode(ENCODER_DIRECTION_PIN,INPUT);
   myEncoder.configureCloseSignal(LOW);  // We have a pullup circuit. So a falling flank initiates the turn
-  myEncoder.configureRange(4, 83, 4, ENCODER_H_WRAP);
+  myEncoder.configureRange(4, 83, 4, ENCODER_H_WRAP); 
   myEncoder.setValue(12);
 
   
@@ -95,6 +80,23 @@ int input_getSecondsSinceLastEvent() {
   return timestamp_difference;
 }
 
+/*!
+  determines if input events and states can be used or should be ignored (e.g. waiting for releas of all buttons)
+  @return true is
+*/
+bool input_is_valid() {
+  return !input_ignore_until_release_flag;
+}
+
+/*!
+  triggers the ignore mechanics. This has no effect on input scanning and tracking but will set input_is_valid to false
+  until all relevant switches are back open again.
+ @param activate boolean if ignore should be started  
+*/
+void input_ignore_until_release(bool activate) {
+  input_ignore_until_release_flag=activate;
+}
+
 /* ******************* General scan function ********************
 * call all scan functions and keeps track of last_event timestamp
 */
@@ -102,6 +104,13 @@ int input_getSecondsSinceLastEvent() {
 void input_scan_tick()
 {
   if(myEncoder.processChange() || input_switch_scan()) input_last_event_time = millis(); // Reset the global age of interaction
+
+  if(input_ignore_until_release_flag) { // check if any relevant switches ist pressed
+    if(input_encoderButton.isClosed()) return;
+    for(byte s=0;s<KEYBOARD_BUTTON_COUNT;s++) if(input_keyboardButton[s].isClosed()) return;
+    
+  }
+  input_ignore_until_release_flag=false; // if not, we can reset the ignore flag
 
 } // input_scan_tick
 
@@ -170,15 +179,13 @@ bool input_switch_scan() {
   bool press_tracer=false;
   #endif
 
-  input_encoderButton.processSignal(digitalRead(ENCODER_SWITCH_PIN)); 
+  has_change|=input_encoderButton.processSignal(digitalRead(ENCODER_SWITCH_PIN)); 
   #ifdef SHOW_KEYPRESS_ON_BUILTIN
     press_tracer|=input_encoderButton.isClosed();
   #endif
 
-  if(input_encoderButton.gotChanged()) has_change=true;
   for(byte s=0;s<KEYBOARD_BUTTON_COUNT;s++){
-    input_keyboardButton[s].processSignal(digitalRead(input_keyboard_pin[s])); 
-    if(input_keyboardButton[s].gotChanged()) has_change=true;
+    has_change|=input_keyboardButton[s].processSignal(digitalRead(input_keyboard_pin[s])); 
     #ifdef SHOW_KEYPRESS_ON_BUILTIN
       press_tracer|=input_keyboardButton[s].isClosed();
     #endif
