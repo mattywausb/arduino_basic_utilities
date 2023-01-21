@@ -2,16 +2,22 @@
 #include "Arduino.h"
 #include "Encoder.h"
 
-#ifdef TRACE_ON
-  #define TRACE_ENCODER
-#endif
-
 
 /* *** */
 Encoder::Encoder() {
+    byte m_prev_signal_state =0;   // state memory for the ISR
+    m_change_amount = 0;    // Collection of changes by the ISR
+    #ifdef ENCODER_H_TRACE
+       byte m_signal_call_count=0;   // for debuggin, we can count ISR calls until the next trace output
+    #endif 
+
+    byte m_process_flags =ENCODER_H_WRAP|ENCODER_H_HIGH_IS_CLOSE_BIT|ENCODER_H_ENABLE_BIT;  // all configuration flags and the change flag are stored here
+    configureRange(10,20,1,0);
+    setValue(0);
  return;
 }
 
+/* ******* API ************* */
 
 /* *** */
 void  Encoder::configureSignalmode(bool high_is_close)
@@ -29,8 +35,10 @@ int16_t Encoder::configureRange(int16_t rangeMin, int16_t rangeMax, int16_t step
   m_process_flags = (m_process_flags & ~ENCODER_H_WRAP_CLIPPED) | wrap_mode;
   m_stepSize = stepSize;
   setValue(m_value); //this will check the value and place it in the new range
-  #ifdef TRACE_ENCODER
-    Serial.print(F("TRACE_ENCODER configureRange:"));
+  #ifdef ENCODER_H_TRACE
+    Serial.print(F("TRACE_ENCODER configureRange("));
+    Serial.print(rangeMin); Serial.print(F(","));
+    Serial.print(rangeMax); Serial.print(F(")"));
     Serial.print(m_rangeMin); Serial.print(F("-"));
     Serial.print(m_rangeMax); Serial.print(F(" Step "));
     Serial.print(m_stepSize); Serial.print(F(" Wrap "));
@@ -38,6 +46,31 @@ int16_t Encoder::configureRange(int16_t rangeMin, int16_t rangeMax, int16_t step
   #endif
 }
 
+/* *** */
+int16_t Encoder::setValue(int16_t newValue) { // set the current value (whithin the defined bounds)
+ m_value = newValue;
+  if (m_value < m_rangeMin) m_value = m_rangeMin;
+  if (m_value > m_rangeMax) m_value = m_rangeMax;
+  m_process_flags &= ~ENCODER_H_PENDING_CHANGE_BIT;
+  m_change_amount=0;
+
+ #ifdef ENCODER_H_TRACE
+    Serial.print(F("TRACE_ENCODER setValue("));
+    Serial.print(newValue); Serial.print(F(") >"));
+    Serial.println(m_value);
+ #endif    
+
+  return m_value;
+}
+
+
+/* *** */
+int16_t Encoder::getValue() {
+  m_process_flags &= ~ENCODER_H_PENDING_CHANGE_BIT;
+  return m_value;
+}; // calling get value will reset "pendingChangeFlag"
+
+/* *********** Processing methods ************** */
 
  /* evaluate the signal and track the change counter  accordingly (This must be called by the ISR )*/
 void Encoder::processSignal(byte clock_signal, byte direction_signal) //  evaluates the signal and tracks the change counter  accordingly
@@ -47,11 +80,12 @@ void Encoder::processSignal(byte clock_signal, byte direction_signal) //  evalua
     direction_signal!=direction_signal;
   }
 
-  #ifdef TRACE_INPUT_ENCODER
+  #ifdef ENCODER_H_TRACE
     m_signal_call_count++;
   #endif
+ 
   #ifdef INPUT_FEEDBACK_ON_LED_BUILTIN
-    digitalWrite(LED_BUILTIN, clock_signal);
+        digitalWrite(LED_BUILTIN, clock_signal);
   #endif
 
   if(!(m_prev_signal_state&ENCODER_H_CLOCK_BIT) && clock_signal) { //clock got closed
@@ -74,15 +108,22 @@ void Encoder::processSignal(byte clock_signal, byte direction_signal) //  evalua
       if(direction_signal) m_prev_signal_state = ENCODER_H_DIRECTION_BIT; //Clock open, 
       else  m_prev_signal_state = 0; // all open
   }
+
+
 }
 
 
 /* *** */
 bool Encoder::processChange(){ 
   bool is_relevant_event=false;
-  
+
   /* transfer high resolution encoder movement into tick encoder value */
   int8_t tick_encoder_change_value = m_change_amount;  // Freeze the value for upcoming operations
+  #ifdef ENCODER_H_TRACE_CHANGE_HIGH
+    Serial.print(F("TRACE_ENCODER_CHANGE_HIGH:"));
+    Serial.print(F("tick_encoder_change_value=")); Serial.println(tick_encoder_change_value);
+  #endif
+
   if (tick_encoder_change_value) { // there are accumulated changes
     if(m_process_flags&ENCODER_H_ENABLE_BIT && tick_encoder_change_value<ENCODER_MAX_CHANGE_PER_TICK && tick_encoder_change_value>-ENCODER_MAX_CHANGE_PER_TICK)   {
       m_value += tick_encoder_change_value * m_stepSize;
@@ -93,8 +134,9 @@ bool Encoder::processChange(){
       m_process_flags |= ENCODER_H_PENDING_CHANGE_BIT;
       is_relevant_event=true;
     }
+ 
     m_change_amount -= tick_encoder_change_value; // remove the processed value from the tracking
-    #ifdef TRACE_INPUT_ENCODER
+    #ifdef ENCODER_H_TRACE
         Serial.print(F("TRACE_ENCODER processChange:"));
         Serial.print(F(" m_signal_call_count=")); Serial.print(m_signal_call_count);
         Serial.print(F("\ttick_encoder_change_value=")); Serial.print(tick_encoder_change_value);
@@ -108,19 +150,4 @@ bool Encoder::processChange(){
 }
 
 
-/* *** */
-int16_t Encoder::setValue(int16_t newValue) { // set the current value (whithin the defined bounds)
- m_value = newValue;
-  if (m_value < m_rangeMin) m_value = m_rangeMin;
-  if (m_value > m_rangeMax) m_value = m_rangeMax;
-  m_process_flags &= ~ENCODER_H_PENDING_CHANGE_BIT;
-  m_change_amount=0;
-  return m_value;
-}
 
-
-/* *** */
-int16_t Encoder::getValue() {
-  m_process_flags &= ~ENCODER_H_PENDING_CHANGE_BIT;
-  return m_value;
-}; // calling get value will reset "pendingChangeFlag"

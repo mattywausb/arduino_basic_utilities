@@ -62,11 +62,14 @@ void input_setup() {
   /* Initalize the encoder */
   pinMode(ENCODER_CLOCK_PIN,INPUT);
   pinMode(ENCODER_DIRECTION_PIN,INPUT);
-  myEncoder.configureSignalmode(false);
-  myEncoder.configureRange(1, 20, 1, ENCODER_H_NO_WRAP);
+  myEncoder.configureSignalmode(false);  // We have a pullup circuit. So a falling flank initiates the turn
+  myEncoder.configureRange(0, 19, 1, ENCODER_H_NO_WRAP);
+  myEncoder.setValue(10);
 
-  // input_encoder_setRange(1, 20, 1, true); // Set Encoder to count from 1 to 20  as default (number of on turns in my test hardware) 
+  input_encoder_setRange(0, 19, 1, true); // Set Encoder to count from 1 to 20  as default (number of on turns in my test hardware) 
+  
   attachInterrupt(digitalPinToInterrupt(ENCODER_CLOCK_PIN),encoder_clock_change_ISR_obj,CHANGE);
+  //attachInterrupt(digitalPinToInterrupt(ENCODER_CLOCK_PIN),encoder_clock_change_ISR,CHANGE);
 
   /* Initialize the switches */
   pinMode(ENCODER_SWITCH_PIN,INPUT_PULLUP);
@@ -231,7 +234,9 @@ bool input_encoder_scan()
 
 
 void encoder_clock_change_ISR_obj() {
-  myEncoder.processSignal(digitalRead(ENCODER_CLOCK_PIN),digitalRead(ENCODER_DIRECTION_PIN));
+  bool direction_state=digitalRead(ENCODER_DIRECTION_PIN);
+  bool clock_state=digitalRead(ENCODER_CLOCK_PIN); 
+  myEncoder.processSignal(clock_state,direction_state);
 }
 
 /* This is the encoders interrupt function */
