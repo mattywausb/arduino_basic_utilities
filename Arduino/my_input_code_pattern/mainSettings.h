@@ -1,2 +1,0 @@
- #define TRACE_ON
- #define INPUT_FEEDBACK_ON_LED_BUILTIN

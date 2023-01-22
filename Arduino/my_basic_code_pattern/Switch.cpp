@@ -7,15 +7,15 @@
 #endif
 
 
-#define DEBOUNCE_INTERVAL 64
 #define DURATION_CAP 32000
-#define HI_RESULOTION_LIMIT 4080
+#define HI_RESOLUTION_LIMIT 4080
 #define DURATION_CAP_UINT8 250
+#define DEFAULT_DEBOUNCE_COOLDOWN 0x40
  
 Switch::Switch() {
-   m_state_flags=SWITCH_H_DURATION_CAP_BIT;
+   m_state_flags=SWITCH_H_DURATION_CAP_BIT|DEFAULT_DEBOUNCE_COOLDOWN;
    #ifdef TRACE_FLAG_CHANGE
-    m_trace_prev_flags=m_state_flags;
+   m_trace_prev_flags=m_state_flags;
    #endif
    m_millies_at_last_change=0; 
    m_last_duration=DURATION_CAP_UINT8;
@@ -29,7 +29,17 @@ void Switch::configureCloseSignal(bool high_is_close)
   else m_state_flags&= ~SWITCH_H_HIGH_IS_CLOSE_BIT;
 }
 
-void Switch::processSignal(byte digital_readout) {
+/* configureDebounceWaittime */
+int8_t Switch::configureDebounceWaittime(int DebounceWaittime)
+{
+  if(DebounceWaittime<0) DebounceWaittime=0;
+  if(DebounceWaittime>127) DebounceWaittime=127;
+  m_state_flags&=~ SWITCH_H_COOLDOWN_BITS ; // Remove previous setting
+  m_state_flags|= (DebounceWaittime&SWITCH_H_COOLDOWN_BITS); // Set new value (but only in the resolution allowed)
+  return (m_state_flags&SWITCH_H_COOLDOWN_BITS);
+}
+
+bool Switch::processSignal(byte digital_readout) {
 
   bool switch_is_closed=(m_state_flags&SWITCH_H_HIGH_IS_CLOSE_BIT)?digital_readout:!digital_readout;
   uint16_t current_time=millis(); // we only care about the last 65536 milliseconds
@@ -46,7 +56,7 @@ void Switch::processSignal(byte digital_readout) {
       }
     } else  { // switch is open
     if(m_state_flags&SWITCH_H_STATE_BIT  ) { // was closed in previous scan
-      if(current_time-m_millies_at_last_change<DEBOUNCE_INTERVAL) return; // Debounce first
+      if(current_time-m_millies_at_last_change<(m_state_flags&SWITCH_H_COOLDOWN_BITS)) return; // Debounce first
       #ifdef TRACE_SWITCH_CHANGE
         Serial.println(F("TRACE_SWITCH_CHANGE> switch got opened after debounce"));
       #endif
@@ -66,7 +76,7 @@ void Switch::processSignal(byte digital_readout) {
 
   /* manage duration memory */
   if(m_state_flags&SWITCH_H_CHANGE_BIT)  { // Change noticed
-    if(duration<=HI_RESULOTION_LIMIT) {
+    if(duration<=HI_RESOLUTION_LIMIT) {
         m_last_duration = duration >> 4 ;// high precision tracking Shift by 4 bit = divide by 16
         m_state_flags |=  SWITCH_H_HIGH_RESOLUTION_DURATION_BIT;
     }  else  {
@@ -82,7 +92,7 @@ void Switch::processSignal(byte digital_readout) {
         m_trace_prev_flags=m_state_flags;
       }
   #endif
-
+  return (m_state_flags&SWITCH_H_CHANGE_BIT);
 }
 
 
