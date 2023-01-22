@@ -22,7 +22,7 @@
 
 /********* Switch configuration *********/
 #define ENCODER_SWITCH_PIN 5
-byte input_keyboard_pin[]={6,7,8};
+byte input_keyboard_pin[]={3,6,7};
 #define KEYBOARD_BUTTON_COUNT 3
 
 /* *********** General state variables of the input module ************ */
@@ -62,6 +62,23 @@ void input_setup() {
     input_keyboardButton[s].configureCloseSignal(LOW); // pullup logic
   }
 
+  /* Setup differenc debounce duration just for testing (can be removed) */
+  int final_debounce_duration=0;
+  final_debounce_duration=input_keyboardButton[0].configureDebounceWaittime(1000); 
+  #ifdef TRACE_INPUT 
+    Serial.print(F("TRACE_INPUT: final debounce durations 0="));
+    Serial.print(final_debounce_duration);
+  #endif
+  final_debounce_duration=input_keyboardButton[1].configureDebounceWaittime(87);
+  #ifdef TRACE_INPUT 
+    Serial.print(F("  1="));
+    Serial.print(final_debounce_duration);
+  #endif
+  final_debounce_duration=input_keyboardButton[2].configureDebounceWaittime(20);
+  #ifdef TRACE_INPUT 
+    Serial.print(F("  2="));
+    Serial.println(final_debounce_duration);
+  #endif
 
 }
 

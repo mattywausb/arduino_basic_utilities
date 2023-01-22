@@ -48,7 +48,7 @@ class Switch
       @param DebounceWaittime positive 8 Bit integer. Will be masked to 0x70. Negative values will be changed to 0
       @return the final value stored
     */
-    int8_t configureDebounceWaittime(int8_t DebounceWaittime);
+    int8_t configureDebounceWaittime(int DebounceWaittime);
 
     /*!
       evaluate the signal and track the changes accordingly (This must be called regulary by the loop)

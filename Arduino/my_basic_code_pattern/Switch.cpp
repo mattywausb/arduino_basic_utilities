@@ -30,12 +30,13 @@ void Switch::configureCloseSignal(bool high_is_close)
 }
 
 /* configureDebounceWaittime */
-int8_t Switch::configureDebounceWaittime(int8_t DebounceWaittime)
+int8_t Switch::configureDebounceWaittime(int DebounceWaittime)
 {
   if(DebounceWaittime<0) DebounceWaittime=0;
+  if(DebounceWaittime>127) DebounceWaittime=127;
   m_state_flags&=~ SWITCH_H_COOLDOWN_BITS ; // Remove previous setting
-  m_state_flags|= (DebounceWaittime&~SWITCH_H_COOLDOWN_BITS); // Set new value (but only in the resolution allowed)
-  return (m_state_flags&~SWITCH_H_COOLDOWN_BITS);
+  m_state_flags|= (DebounceWaittime&SWITCH_H_COOLDOWN_BITS); // Set new value (but only in the resolution allowed)
+  return (m_state_flags&SWITCH_H_COOLDOWN_BITS);
 }
 
 bool Switch::processSignal(byte digital_readout) {
@@ -55,7 +56,7 @@ bool Switch::processSignal(byte digital_readout) {
       }
     } else  { // switch is open
     if(m_state_flags&SWITCH_H_STATE_BIT  ) { // was closed in previous scan
-      if(current_time-m_millies_at_last_change<(m_state_flags&~SWITCH_H_COOLDOWN_BITS)) return; // Debounce first
+      if(current_time-m_millies_at_last_change<(m_state_flags&SWITCH_H_COOLDOWN_BITS)) return; // Debounce first
       #ifdef TRACE_SWITCH_CHANGE
         Serial.println(F("TRACE_SWITCH_CHANGE> switch got opened after debounce"));
       #endif
