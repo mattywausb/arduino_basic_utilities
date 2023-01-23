@@ -1,8 +1,9 @@
-#define SEGMENT_60_EQUIVALENT 2048
-#define SEGMENT_BINARY_DECIMALS 11
-#define SEGMENT_DECIMAL_MASK 0x07ff
-#define VALUE_1_EQUIVALENT 128
-#define VALUE_BINARY_DECIMALS 7
+#define VALUE_1_D10 1024
+#define D10_DECIMALS 10
+#define D10_DECIMAL_MASK 0x03ff
+#define VALUE_1_D7 128
+#define D7_DECIMALS 7
+#define SCALE_SHIFT 3
 
 void setup() {
   // put your setup code here, to run once:
@@ -21,35 +22,43 @@ int16_t input_fact=200;
 
 void integer_implementation()
 {
+
+  byte red,green,blue;
 Serial.println("-start- Integer implementation" );
   unsigned long start_time = micros();
   unsigned long start_rgb =0;
+  int32_t partner_segment_fraction_d20;
   // multiply in binary fixed point artihmetic 128=1.00
 
-  uint8_t int8_value=((int16_t)(input_value<<VALUE_BINARY_DECIMALS))/100;  // convert from 0-100 to 0-128 (100=128)
+  uint8_t value_d7=((int16_t)(input_value<<D7_DECIMALS))/100;  // convert from 0-100 to 0-128 (100=128)
                                                           // useful wenn 100 is fixed integer with 2 decimals (1.00)
                                                           // this results in a binary number with 7 "decimals" (1.0000000)
-  int16_t int16_fact=((input_fact<<7))/100;
+  int16_t fact_d7=((input_fact<<7))/100;
 
-  uint8_t int8_product=((int8_value*int16_fact)>>VALUE_BINARY_DECIMALS);   // Muliply while having 7 binary "decimals"
-  int8_t  output_product=(((int16_t)int8_product *100)>>VALUE_BINARY_DECIMALS);
+  uint8_t product_d7=((value_d7*fact_d7)>>D7_DECIMALS);   // Muliply while having 7 binary "decimals"
+  int8_t  output_product=(((int16_t)product_d7 *100)>>D7_DECIMALS);
 
-  uint8_t int8_saturation=((int16_t)(input_saturation<<VALUE_BINARY_DECIMALS))/100;  // Convert from 3 digit Decimal to 8 Digit binary 
+  uint8_t saturation_d7=((int16_t)(input_saturation<<D7_DECIMALS))/100;  // Convert from 3 digit Decimal to 8 Digit binary 
 
-  int16_t int16_hue=((input_hue*34)+((input_hue/15)<<1)); // convert from 360 = 12288 or 60=2048, allowing fast division by 60 for rgb calculation
+  int16_t hue_d10=((input_hue*17)+((input_hue/15))); // convert from 360 = 6144 or 60=1024, allowing fast division by 60 for rgb calculation
+                                                        // since 100 0000 0000 is equivalent to 60 = resolution of 0,06 degree
 
+  // time critical rgb conversion startes here
   start_rgb=micros();
-  int8_t hue_segment=int16_hue>>SEGMENT_BINARY_DECIMALS;   // Divide by "60"
-  int16_t hue_segment_offset=int16_hue & SEGMENT_DECIMAL_MASK; //Get last 11 Bits = "Modulo 60"
-  int16_t int16_white_factor=(int8_value*(VALUE_1_EQUIVALENT-int8_saturation))>>VALUE_BINARY_DECIMALS; // >>7 for Decimal point shifting
+  int8_t hue_segment_d10=hue_d10>>D10_DECIMALS;   // "Divide hue degrees by 60" (6 Segments red - yellow- green- cyan - blue - magenta)
+  int16_t hue_segment_fraction_d10=hue_d10 & D10_DECIMAL_MASK; //Get last 10 Bits = "Modulo 60" = fraction inside in the segment
+  int16_t white_factor_d7=(value_d7*(VALUE_1_D7-saturation_d7))>>D7_DECIMALS; // >>7 for Decimal point shifting
 
-  int16_t int16_growing_neighbor=((int16_t)int8_value*(VALUE_1_EQUIVALENT-((int8_saturation*(hue_segment_offset)>>4)) >> VALUE_BINARY_DECIMALS))>>VALUE_BINARY_DECIMALS;
-  int16_t int16_fading_neighbor=((int16_t)int8_value*(VALUE_1_EQUIVALENT-((int8_saturation*((SEGMENT_60_EQUIVALENT-hue_segment_offset)>>4)) >> VALUE_BINARY_DECIMALS)))>>VALUE_BINARY_DECIMALS;
+  if(hue_segment_d10%2==0)  partner_segment_fraction_d20 = (((int32_t)VALUE_1_D10<<D10_DECIMALS) - (((int32_t)saturation_d7)<<SCALE_SHIFT) * (VALUE_1_D10-hue_segment_fraction_d10) );
+  else                      partner_segment_fraction_d20 = (((int32_t)VALUE_1_D10<<D10_DECIMALS) - (((int32_t)saturation_d7)<<SCALE_SHIFT) *               hue_segment_fraction_d10  ) ;
+
+  int16_t partner_factor_d10= ((((int32_t)value_d7)<<SCALE_SHIFT) *partner_segment_fraction_d20)>>(2*D10_DECIMALS);
 
 
+  // end of time critical part
+  unsigned long end_time = micros();
 
   // Print results
-  unsigned long end_time = micros();
   Serial.print("Runtime: " );Serial.print(end_time-start_time);Serial.println(" us" );
   Serial.print("Runtime rgb: " );Serial.print(end_time-start_rgb);Serial.println(" us" );
 
@@ -57,16 +66,16 @@ Serial.println("-start- Integer implementation" );
   Serial.print("input_saturation= ");Serial.println(input_saturation);
   Serial.print("input_value= ");Serial.println(input_value);
   Serial.print("input_fact= ");Serial.println(input_fact);
-  Serial.print("int16_hue= ");Serial.print(int16_hue);Serial.print(" 0x");Serial.println(int16_hue,HEX);
-  Serial.print("int8_saturation= ");Serial.print(int8_saturation);Serial.print(" 0x");Serial.println(int8_saturation,HEX);
-  Serial.print("int8_value= ");Serial.print(int8_value);Serial.print(" 0x");Serial.println(int8_value,HEX);
-  Serial.print("int16_fact= ");Serial.print(int16_fact);;Serial.print(" 0x");Serial.println(int16_fact,HEX);
-  Serial.print("int8_product= ");Serial.print(int8_product); Serial.print(" 0x");Serial.println(int8_product,HEX);
-  Serial.print("hue_segment= ");Serial.print(hue_segment); Serial.print(" 0x");Serial.println(hue_segment,HEX);
-  Serial.print("hue_segment_offset= ");Serial.print(hue_segment_offset); Serial.print(" 0x");Serial.println(hue_segment_offset,HEX);
-  Serial.print("int16_white_factor= ");Serial.print(int16_white_factor); Serial.print(" 0x");Serial.println(int16_white_factor,HEX);
-  Serial.print("int16_growing_neighbor= ");Serial.print(int16_growing_neighbor); Serial.print(" 0x");Serial.println(int16_growing_neighbor,HEX);
-  Serial.print("int16_fading_neighbor= ");Serial.print(int16_fading_neighbor); Serial.print(" 0x");Serial.println(int16_fading_neighbor,HEX);
+  Serial.print("hue_d10= ");Serial.print(hue_d10);Serial.print(" 0x");Serial.println(hue_d10,HEX);
+  Serial.print("saturation_d7= ");Serial.print(saturation_d7);Serial.print(" 0x");Serial.println(saturation_d7,HEX);
+  Serial.print("value_d7= ");Serial.print(value_d7);Serial.print(" 0x");Serial.println(value_d7,HEX);
+  Serial.print("fact_d7= ");Serial.print(fact_d7);;Serial.print(" 0x");Serial.println(fact_d7,HEX);
+  Serial.print("product_d7= ");Serial.print(product_d7); Serial.print(" 0x");Serial.println(product_d7,HEX);
+  Serial.print("hue_segment_d10= ");Serial.print(hue_segment_d10); Serial.print(" 0x");Serial.println(hue_segment_d10,HEX);
+  Serial.print("hue_segment_fraction_d10= ");Serial.print(hue_segment_fraction_d10); Serial.print(" 0x");Serial.println(hue_segment_fraction_d10,HEX);
+  Serial.print("white_factor_d7= ");Serial.print(white_factor_d7); Serial.print(" 0x");Serial.println(white_factor_d7,HEX);
+  Serial.print("partner_segment_fraction_d20= ");Serial.print(partner_segment_fraction_d20); Serial.print(" 0x");Serial.println(partner_segment_fraction_d20,HEX);
+  Serial.print("partner_factor_d10= ");Serial.print(partner_factor_d10); Serial.print(" 0x");Serial.println(partner_factor_d10,HEX);
   
   Serial.print("output_product =");Serial.println(output_product);
 
