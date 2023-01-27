@@ -1,18 +1,15 @@
 #ifndef LAMPTRANSITION_H
 #define LAMPTRANSITION_H
 
-// the following typedef is also declared in Lamphsv.h so we need to ensure only one declaraion 
-#ifndef T_LAMP_RGB_COLOR
-#define T_LAMP_RGB_COLOR
-typedef struct {
-    uint8_t r;       // 0-255
-    uint8_t g;       // 0-255
-    uint8_t b;       // 0-255
-} t_lamp_rgb_color;
-#endif
+#include "mainSettings.h"
 
-#define LAMPTRANSITION_PENDING_INDICATIOR 0xffff
-#define LAMPTRANSITION_DONE_INDICATIOR 0
+
+// the following typedef is also declared in Lamphsv.h so we need to ensure only one declaraion 
+
+
+
+#define LAMPTRANSITION_PENDING_INDICATOR 0xffff
+#define LAMPTRANSITION_DONE_INDICATOR 0
 
 
 enum transition_type_t {TT_NONE,TT_FADEIN,TT_FADEOUT,TT_BLEND};
@@ -45,7 +42,7 @@ class LampTransition
       @param blue : Amount of green in 8 bit (255= max value)
       @
     */
-    void setCurrentColor(uint8_t red, uint8_t green, uint8_t blue) {m_current_red=red; m_current_green=green; m_current_blue=blue; m_transition_duration_16ms=LAMPTRANSION_DONE_INDICATIOR;};
+    void setCurrentColor(uint8_t red, uint8_t green, uint8_t blue) {m_current_red=red; m_current_green=green; m_current_blue=blue; m_transition_duration_16ms=LAMPTRANSITION_DONE_INDICATOR;};
 
     /*!
       set the current color. This will stop the the transition and set the color to the given values.The transition
@@ -53,7 +50,7 @@ class LampTransition
       (more efficient pointer version, only pushes 2 bytes to the stack )
       @param pRGBColor : Pointer to a t_lamp_rgb_color struct
     */
-    void setCurrentColor(t_lamp_rgb_color * pRGBColor) {m_current_red=pRGBColor->r; m_current_green=pRGBColor->g; m_current_blue=pRGBColor->b; m_transition_duration_16ms=LAMPTRANSION_DONE_INDICATIOR;};
+    void setCurrentColor(t_lamp_rgb_color * pRGBColor) {m_current_red=pRGBColor->r; m_current_green=pRGBColor->g; m_current_blue=pRGBColor->b; m_transition_duration_16ms=LAMPTRANSITION_DONE_INDICATOR;};
 
     /*!
       set the current color. This will stop the the transition and set the color to the given values. The transition
@@ -64,7 +61,7 @@ class LampTransition
       @param blue : Amount of green in 8 bit (255= max value)
       @
     */
-    void setTargetColor(uint8_t red, uint8_t green, uint8_t blue) {m_target_red=red; m_target_green=green; m_target_blue=blue; m_transition_duration_16ms=LAMPTRANSION_PENDING_INDICATIOR;};
+    void setTargetColor(uint8_t red, uint8_t green, uint8_t blue) {m_target_red=red; m_target_green=green; m_target_blue=blue; m_transition_duration_16ms=LAMPTRANSITION_PENDING_INDICATOR;};
 
     /*!
       change the color to transition to. If already in transition, this will change the direction but not the timeline.
@@ -75,14 +72,14 @@ class LampTransition
       @param blue : Amount of green in 8 bit (255= max value)
       @
     */
-    void setTargetColor(t_lamp_rgb_color * pRGBColor) {m_target_red= pRGBColor->r; m_target_green=pRGBColor->g; m_target_blue=pRGBColor->b; m_transition_duration_16ms=LAMPTRANSION_PENDING_INDICATIOR;};
+    void setTargetColor(t_lamp_rgb_color * pRGBColor) {m_target_red= pRGBColor->r; m_target_green=pRGBColor->g; m_target_blue=pRGBColor->b; m_transition_duration_16ms=LAMPTRANSITION_PENDING_INDICATOR;};
 
 
     /*!
       Initiate the transition from the current color to the target color for the given duration. last setCurrentTime will be used as start time
       @param duration_ms : Duration of the transition in ms (will be capped to 1.048 seconds and reduced in granularity to 16ms)
     */
-    void startTransition(unint32_t duration_ms);
+    void startTransition(uint32_t duration_ms);
 
     /*!
       Immediatly jump to the final target color and end the transition.  The transition
@@ -106,14 +103,13 @@ class LampTransition
       Determine if the lamp is in transition. Can be used to prevent unnecessary calls to get current color
       @return True if lamp is in a transition process
     */
-    bool isInTransition() {return m_transition_duration_16ms!=LAMPTRANSITION_DONE_INDICATIOR && m_transition_duration_16ms!=LAMPTRANSITION_PENDING_INDICATIOR;};
+    bool isInTransition() {return m_transition_duration_16ms!=LAMPTRANSITION_DONE_INDICATOR && m_transition_duration_16ms!=LAMPTRANSITION_PENDING_INDICATOR;};
 
     /*!
       Determine if transition has not been started since the last setting of target colors.
       @return True if 
     */
-    bool isTransitionPending();
-      transition_type_t getTransitionType() {return m_transition_duration_16ms==LAMPTRANSITION_PENDING_INDICATIOR;};
+    bool isTransitionPending() {return m_transition_duration_16ms==LAMPTRANSITION_PENDING_INDICATOR;};
 
   protected:
       uint16_t  m_start_transition_time_16ms=0;  // Point in time, the transition started  in internal scale
@@ -122,7 +118,7 @@ class LampTransition
       uint8_t   m_target_red, m_target_green, m_target_blue;
 
   private:
-      static uint16_t s_current_time_16ms=0;  // The current time used in time specific method in internal scale
+      static uint16_t s_current_time_16ms;  // The current time used in time specific method in internal scale
 
 };
 

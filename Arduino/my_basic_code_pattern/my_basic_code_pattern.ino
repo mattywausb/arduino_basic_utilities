@@ -35,6 +35,7 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, true); // light LED during setup
 
+  output_setup();
   input_setup();
 
   // init variables
@@ -44,6 +45,7 @@ void setup() {
 
   // finally
   digitalWrite(LED_BUILTIN, false); // setup complete, so switch off LED
+  output_init_SHOW_scene();
   enter_mode_SHOW();
 } // end of setup()
 
@@ -116,6 +118,8 @@ void process_mode_SHOW() {
     Serial.println();
   }
 
+  output_update_SHOW_scene();
+
   // Dump keyboard values to serial everey DUMP_INTERVAL
   unsigned long current_time = millis();
   if(current_time-prev_dump_time>=DUMP_INTERVAL) {
@@ -159,6 +163,8 @@ void process_mode_SET() {
         return;
     }
   } //end "if input is valid"
+
+  output_update_SHOW_scene();
 }
 
 /* ******************** Memory Helper *************** */

@@ -232,7 +232,7 @@ void Lamphsv::multiply_value(int16_t factor)
 #define SCALE_SHIFT 3
 
 t_lamp_rgb_color Lamphsv::get_color_rgb() {
-  t_lamphsv_rgb_color result;
+  t_lamp_rgb_color result;
   get_color_rgb(&result);
   return result;
 };

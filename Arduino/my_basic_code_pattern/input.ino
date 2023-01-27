@@ -1,13 +1,13 @@
 /* Functions to handle all input elements */
-
+#include "Arduino.h"
 #include "mainSettings.h"
 #include "Switch.h"
 #include "Encoder.h"
 // Activate general trace output
 
 #ifdef TRACE_ON
-#define TRACE_INPUT 
-#define TRACE_INPUT_ENCODER
+//#define TRACE_INPUT 
+//#define TRACE_INPUT_ENCODER
 #endif
 
 #define SHOW_KEYPRESS_ON_BUILTIN
@@ -39,7 +39,9 @@ Switch input_encoderButton;
 Switch input_keyboardButton[KEYBOARD_BUTTON_COUNT];
 
 /* ***************************       S E T U P           ******************************
-*/
+   Must be called by setup function of sketch to initialize all input ports, 
+   tracking variables and devices
+ * ----------------------------------------------------------------------------------- */
 
 void input_setup() {
 

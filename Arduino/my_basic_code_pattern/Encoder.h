@@ -8,7 +8,7 @@
 */
 
 #ifdef TRACE_ON
-   #define ENCODER_H_TRACE
+ //  #define ENCODER_H_TRACE
  //  #define ENCODER_H_TRACE_CHANGE_HIGH
 #endif
 

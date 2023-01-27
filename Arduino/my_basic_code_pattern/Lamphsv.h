@@ -3,6 +3,7 @@
 #include "Arduino.h"
 #include "mainSettings.h"
 
+
 #ifdef TRACE_ON
     #define LAMPHSV_ADD_TRACE_METHODS
 #endif
@@ -26,12 +27,10 @@
 
 #ifndef T_LAMP_RGB_COLOR
 #define T_LAMP_RGB_COLOR
-typedef struct {
-    uint8_t r;       // 0-255
-    uint8_t g;       // 0-255
-    uint8_t b;       // 0-255
-} t_lamp_rgb_color;
+
 #endif
+
+
 
 typedef struct {
     int16_t h;       // 0-360 Degree  (internally scaled to 6144, wichs leads to 1024 to 60 degree for fast integer arithmetic)
