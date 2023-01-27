@@ -3,6 +3,10 @@
 #include "Arduino.h"
 #include "mainSettings.h"
 
+#ifdef TRACE_ON
+    #define LAMPHSV_ADD_TRACE_METHODS
+#endif
+
 #define LAMPHSV_HUE_RED 0
 #define LAMPHSV_HUE_ORANGE 15.0
 #define LAMPHSV_HUE_YELLOW 45.0
@@ -14,18 +18,26 @@
 #define LAMPHSV_HUE_MAGENTA 300.0
 #define LAMPHSV_HUE_PINK 340.0
 
+#define LAMPHSV_CHANGE_BIT 0x4000
+#define LAMPHSV_HUE_SCALE 6144
+#define LAMPHSV_SATURATION_INTERNAL_MAX 128
+#define LAMPHSV_VALUE_INTERNAL_MAX 128
+#define LAMPHSV_8BIT_DECIMALS 7
+
+#ifndef T_LAMP_RGB_COLOR
+#define T_LAMP_RGB_COLOR
+typedef struct {
+    uint8_t r;       // 0-255
+    uint8_t g;       // 0-255
+    uint8_t b;       // 0-255
+} t_lamp_rgb_color;
+#endif
 
 typedef struct {
-    byte r;       // 0-255
-    byte g;       // 0-255
-    byte b;       // 0-255
-} t_lamphsv_color_rgb;
-
-typedef struct {
-    int16_t h;       // angle in 1/10 degrees (0-3600)
-    int8_t s;       // saturation from 0-100
-    int8_t v;       // value from 0-100
-} t_lamphsv_color;
+    int16_t h;       // 0-360 Degree  (internally scaled to 6144, wichs leads to 1024 to 60 degree for fast integer arithmetic)
+    uint8_t s;  // 0-100 with 100 equivalent to 1.00 (internally scaled to 0-128 for fast integer arithmetic)
+    uint8_t v;       // 0-100 with 100 equivalent to 1.00 (internally scaled to 0-128 for fast integer arithmetic)
+} t_lamp_hsv_color;
 
 /*!
   Store and manipulate color of a lamp as hue(in degree), saturation and value(=intensity). Provide RGB value for sending to 
@@ -37,11 +49,11 @@ class Lamphsv {
         /*!
           Constructor
         */
-        Lamp(void);
+        Lamphsv(void);
 
         /*! 
           Set hsv values of the lamp
-          @param hue Define the hue in 1/10s degrees (from 0 to 3599)
+          @param hue Define the hue in 1/10s degrees (from 0 to 359)
           @param saturation Define the saturation with 100  = full color and 0 = no color/white
           @param value Define the value with 100 = full brightness and 0= dark/off
         */
@@ -54,32 +66,20 @@ class Lamphsv {
           @param saturation Define the saturation with 1.0 = full color and 0.0= not saturated/white
           @param value Define the value with 1.0 = full brightness and 0= dark/off
         */
-        void set_hsv(float hue,float saturation,float value) {set_hsv((int16_t)(hue*10.0),(int8_t)(saturation*100.0),(int8_t)(value*100.0));};
+        void set_hsv(float hue,float saturation,float value) {set_hsv((int16_t)(hue),(uint8_t)(saturation*100.0),(uint8_t)(value*100.0));};
 
         /*! 
           Get hue value 
           @return hue value in 1/10 degress (0-3599)
         */
-        int16_t get_hue() {return m_hue};
+        int16_t get_hue(); //one bit is used as change indicator, so we must mask ist
 
         /*! 
-          Get hue value as float
-          @return hue value in degress (0-360)
-        */
-        int16_t get_hue_float() {return ((float)m_hue)/10.0);};
- 
-        /*! 
           Set hue to  a specific angle. Values out of bound will be set to 0.
-          @param hue Define the hue in 1/10s degrees (from 0 to 3599)
+          @param hue Define the hue in degrees (from 0 to 359)
         */
         void set_hue(int16_t angle) ;
         
-        /*! 
-          Set hue to  a specific angle. Values out of bound will be set to 0. (Slow float version)
-          @param hue Define the hue in degrees (Only Fractions of 1/10 will be stored)
-        */
-        void set_hue(float angle) {set_hue((int16_t)(angle*10.0))};
-
         /*! 
           Change the hue by a specific angle. This will shift the color in the spectrum. 
           The result will be wrapped at the end of the value range to provide borderles behaviour
@@ -91,7 +91,7 @@ class Lamphsv {
           Get saturation value 
           @return saturation value 100=full color 0= no color/white
         */
-        int8_t get_saturation() {return m_saturation;}  ;
+        int8_t get_saturation() ;
 
         /*! 
           Set saturation to  a specific value. 100=full color 0= no color/white.  Values out of bound will be clipped to lower or upper bound accordingly
@@ -117,7 +117,7 @@ class Lamphsv {
           Get value 
           @return value value 0=dark 100= highest intensity
         */
-        int8_t get_value() {return m_value;}  ;
+        int8_t get_value()  ;
 
         /*! 
           Set value to  a specific value. 0=dark 100= highest intensity  Values out of bound will be clipped to lower or upper bound accordingly
@@ -139,18 +139,38 @@ class Lamphsv {
         */
         void multiply_value(int16_t factor);
 
-
-        void trace_hsv();
-        void trace_rgb(t_color_rgb_int color_rgb );
-
         /*!
-          Calculate the current rgb values
+          Check, if color has changed since the last get_color_rgb
           @return rgb values for the current color in as t_lamphsv_color_rgb 
         */
-        t_lamphsv_color_rgb get_color_rgb(float maximum_value);
+
+        bool is_changed() {return (m_hue_60_d10 & LAMPHSV_CHANGE_BIT!=0);}
+
+        /*!
+          Get the current rgb values. This will reset the is_changed flag
+          @return rgb values for the current color in as t_lamphsv_color_rgb 
+        */
+        t_lamp_rgb_color get_color_rgb() ;
+
+        /*!
+          Provide the current rgb values in a given buffer of t_lamphsv_color_rgb. This will reset the is_changed flag.
+          Since the result normally is instantly pushed to a neopixel or other function, using the pointer will take less time for value transfer in memory,
+          @param pTarget pointer to a t_lamp_rgb_color variable for storing the rgb values
+        */
+        void get_color_rgb(t_lamp_rgb_color *pTarget);
+
+        #ifdef LAMPHSV_ADD_TRACE_METHODS
+        /*!
+          Provide a complete diagnosis on serial
+        */
+          void print_members_to_serial();
+          //void print_rgb_to_serial();
+        #endif
 
  protected:
-        t_color_hsv m_color_hsv;
+        int16_t m_hue_60_d10;  // hue scaled so it has 60 degrees at bit 11 (10 decimals)
+        uint8_t m_saturation_d7;
+        uint8_t m_value_d7;
         
 };
         
