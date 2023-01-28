@@ -10,12 +10,14 @@
 enum PROCESS_MODES {
   SHOW, 
   SET_HUE,
-  SET_SATURATION
+  SET_SATURATION,
+  SET_VALUE
 };
 
 Lamphsv g_Lamphsv; // central Lamphsv parameters that will be changed by input
 
 byte g_step_size=1;
+byte g_set_pixel=0;
 
 PROCESS_MODES g_process_mode=SHOW;
 
@@ -68,6 +70,7 @@ void loop()
     case SHOW: process_mode_SHOW();break;
     case SET_HUE: process_mode_SET_HUE();break;
     case SET_SATURATION: process_mode_SET_SATURATION();break;
+    case SET_VALUE: process_mode_SET_VALUE();break;
    } // switch
 }
 
@@ -93,6 +96,7 @@ void process_mode_SHOW() {
   if(input_isRelevant()) {
     // Change to set mode in long press of key 1
     if(input_key_gotPressed(2)) {
+      output_init_SET_scene();
       enter_mode_SET_HUE();
       return;
     }
@@ -103,10 +107,6 @@ void process_mode_SHOW() {
         if(encoder_button_press_count%2) input_encoder_disable();
         else input_encoder_enable();
     }
-
-
-
-
 
     // Count keyboard presses (just for demo)
     for(byte k=0;k<KEY_COUNT;k++) {
@@ -166,7 +166,6 @@ void enter_mode_SET_HUE() {
   g_step_size=6;
   input_encoder_setRange(0,359,g_step_size,true);
   input_encoder_setValue(g_Lamphsv.get_hue());
-  output_init_SET_scene();
 }
 
 void process_mode_SET_HUE() {
@@ -184,6 +183,13 @@ void process_mode_SET_HUE() {
       enter_mode_SET_SATURATION();
       return;
     }
+
+    if(input_key_gotPressed(0)) {
+      if(++g_set_pixel>=8)g_set_pixel=0;      
+      output_update_SET_scene_switch_pixel();
+      return;
+    }
+    
 
     // Change step size of encoder
     if(input_encoder_gotPressed()) {
@@ -205,7 +211,7 @@ void process_mode_SET_HUE() {
   output_update_SET_scene(); // out
 }
 
-/* ========= MODE SET_HUE =================== */
+/* ========= MODE SET_SATURATION =================== */
 
 void enter_mode_SET_SATURATION() {
 
@@ -221,7 +227,6 @@ void enter_mode_SET_SATURATION() {
   g_step_size=5;
   input_encoder_setRange(0,100,g_step_size,false);
   input_encoder_setValue(g_Lamphsv.get_saturation());
-  output_init_SET_scene();
 }
 
 void process_mode_SET_SATURATION() {
@@ -233,10 +238,17 @@ void process_mode_SET_SATURATION() {
       return;
     }
 
+
+    if(input_key_gotPressed(0)) {
+      if(++g_set_pixel>=8)g_set_pixel=0;
+      output_update_SET_scene_switch_pixel();
+      return;
+    }
+
     // Change to set hue  mode when key 1 got pressed
 
     if(input_key_gotPressed(1)) {
-      enter_mode_SET_HUE();
+      enter_mode_SET_VALUE();
       return;
     }
 
@@ -260,6 +272,67 @@ void process_mode_SET_SATURATION() {
   output_update_SET_scene(); 
 }
 
+
+/* ========= MODE SET_VALUE =================== */
+
+void enter_mode_SET_VALUE() {
+
+  g_process_mode=SET_VALUE;
+  input_ignoreUntilRelease(true);
+  #ifdef TRACE_MODES
+      Serial.println(F("---> SET_VALUE <---"));
+      Serial.print(freeMemory());
+      Serial.print(F(" bytes free memory. "));
+      Serial.print(millis()/1000);
+      Serial.println(F(" seconds uptime"));
+  #endif  
+  g_step_size=5;
+  input_encoder_setRange(0,100,g_step_size,false);
+  input_encoder_setValue(g_Lamphsv.get_value());
+}
+
+void process_mode_SET_VALUE() {
+
+  if(input_isRelevant()) {
+    // Change to show mode when key 2 got pressed
+    if(input_key_gotPressed(2)) {
+      enter_mode_SHOW();
+      return;
+    }
+
+
+    if(input_key_gotPressed(0)) {
+      if(++g_set_pixel>=8)g_set_pixel=0;
+      output_update_SET_scene_switch_pixel();
+      return;
+    }
+
+    // Change to set hue  mode when key 1 got pressed
+
+    if(input_key_gotPressed(1)) {
+      enter_mode_SET_HUE();
+      return;
+    }
+
+    // Change step size of encoder
+    if(input_encoder_gotPressed()) {
+        g_step_size=g_step_size>1?1:5;
+        input_encoder_setRange(0,100,g_step_size,false);
+    }
+
+    // Set hue to encoder value 
+    if(input_encoder_hasPendingChange()) {
+      g_Lamphsv.set_value(input_encoder_getValue());
+      #ifdef TRACE_PARAMETER_CHANGE
+        Serial.print(F("TRACE_PARAMETER_CHANGE > value:"));
+        Serial.println(g_Lamphsv.get_value());
+        g_Lamphsv.print_members_to_serial();
+      #endif
+    }
+  } //end "if input_isRelevant"
+
+  output_update_SET_scene(); 
+}
 /* ******************** Memory Helper *************** */
  
 #ifdef __arm__

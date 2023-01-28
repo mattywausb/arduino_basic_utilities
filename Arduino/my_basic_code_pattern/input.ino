@@ -66,12 +66,12 @@ void input_setup() {
 
   /* Setup differenc debounce duration just for testing (can be removed) */
   int final_debounce_duration=0;
-  final_debounce_duration=input_keyboardButton[0].configureDebounceWaittime(1000); 
+  final_debounce_duration=input_keyboardButton[0].configureDebounceWaittime(400); 
   #ifdef TRACE_INPUT 
     Serial.print(F("TRACE_INPUT: final debounce durations 0="));
     Serial.print(final_debounce_duration);
   #endif
-  final_debounce_duration=input_keyboardButton[1].configureDebounceWaittime(20);
+  final_debounce_duration=input_keyboardButton[1].configureDebounceWaittime(100);
   #ifdef TRACE_INPUT 
     Serial.print(F("  1="));
     Serial.print(final_debounce_duration);

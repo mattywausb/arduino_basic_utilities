@@ -100,16 +100,24 @@ void output_init_SET_scene()
   output_g_color_register_1.b=0;
   output_led_set_bar(&output_g_color_register_1);
   g_Lamphsv.get_color_rgb(&output_g_color_register_2);
-  output_led_set_pixel(0,&output_g_color_register_2);
+  output_led_set_pixel(g_set_pixel,&output_g_color_register_2);
   output_led_push();
 }
+
+void output_update_SET_scene_switch_pixel()
+{
+  g_Lamphsv.get_color_rgb(&output_g_color_register_2);
+  output_led_set_pixel(g_set_pixel,&output_g_color_register_2);
+  output_led_push();
+}
+
 
 void output_update_SET_scene()
 {
   if(!g_Lamphsv.is_changed()) return;
   
   g_Lamphsv.get_color_rgb(&output_g_color_register_2);
-  output_led_set_pixel(0,&output_g_color_register_2);
+  output_led_set_pixel(g_set_pixel,&output_g_color_register_2);
   output_led_push();
   #ifdef TRACE_OUTPUT_RGB
      Serial.print(F("TRACE_OUTPUT_RGB>"));
