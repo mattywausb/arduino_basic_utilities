@@ -15,6 +15,7 @@ enum PROCESS_MODES {
 
 Lamphsv g_Lamphsv; // central Lamphsv parameters that will be changed by input
 
+byte g_step_size=1;
 
 PROCESS_MODES g_process_mode=SHOW;
 
@@ -66,6 +67,7 @@ void loop()
    switch(g_process_mode) {
     case SHOW: process_mode_SHOW();break;
     case SET_HUE: process_mode_SET_HUE();break;
+    case SET_SATURATION: process_mode_SET_SATURATION();break;
    } // switch
 }
 
@@ -161,7 +163,8 @@ void enter_mode_SET_HUE() {
       Serial.print(millis()/1000);
       Serial.println(F(" seconds uptime"));
   #endif  
-  input_encoder_setRange(0,359,true);
+  g_step_size=6;
+  input_encoder_setRange(0,359,g_step_size,true);
   input_encoder_setValue(g_Lamphsv.get_hue());
   output_init_SET_scene();
 }
@@ -174,6 +177,21 @@ void process_mode_SET_HUE() {
       enter_mode_SHOW();
       return;
     }
+
+    // Change to set saturation mode when key 1 got pressed
+
+    if(input_key_gotPressed(1)) {
+      enter_mode_SET_SATURATION();
+      return;
+    }
+
+    // Change step size of encoder
+    if(input_encoder_gotPressed()) {
+        g_step_size=g_step_size>1?1:6;
+        input_encoder_setRange(0,359,g_step_size,true);
+    }
+
+    // Set hue to encoder value 
     if(input_encoder_hasPendingChange()) {
       g_Lamphsv.set_hue(input_encoder_getValue());
       #ifdef TRACE_PARAMETER_CHANGE
@@ -182,9 +200,64 @@ void process_mode_SET_HUE() {
         g_Lamphsv.print_members_to_serial();
       #endif
     }
-  } //end "if input is valid"
+  } //end "if input_isRelevant"
 
   output_update_SET_scene(); // out
+}
+
+/* ========= MODE SET_HUE =================== */
+
+void enter_mode_SET_SATURATION() {
+
+  g_process_mode=SET_SATURATION;
+  input_ignoreUntilRelease(true);
+  #ifdef TRACE_MODES
+      Serial.println(F("---> SET_SATURATION <---"));
+      Serial.print(freeMemory());
+      Serial.print(F(" bytes free memory. "));
+      Serial.print(millis()/1000);
+      Serial.println(F(" seconds uptime"));
+  #endif  
+  g_step_size=5;
+  input_encoder_setRange(0,100,g_step_size,false);
+  input_encoder_setValue(g_Lamphsv.get_saturation());
+  output_init_SET_scene();
+}
+
+void process_mode_SET_SATURATION() {
+
+  if(input_isRelevant()) {
+    // Change to show mode when key 2 got pressed
+    if(input_key_gotPressed(2)) {
+      enter_mode_SHOW();
+      return;
+    }
+
+    // Change to set hue  mode when key 1 got pressed
+
+    if(input_key_gotPressed(1)) {
+      enter_mode_SET_HUE();
+      return;
+    }
+
+    // Change step size of encoder
+    if(input_encoder_gotPressed()) {
+        g_step_size=g_step_size>1?1:5;
+        input_encoder_setRange(0,100,g_step_size,false);
+    }
+
+    // Set hue to encoder value 
+    if(input_encoder_hasPendingChange()) {
+      g_Lamphsv.set_saturation(input_encoder_getValue());
+      #ifdef TRACE_PARAMETER_CHANGE
+        Serial.print(F("TRACE_PARAMETER_CHANGE > saturation:"));
+        Serial.println(g_Lamphsv.get_saturation());
+        g_Lamphsv.print_members_to_serial();
+      #endif
+    }
+  } //end "if input_isRelevant"
+
+  output_update_SET_scene(); 
 }
 
 /* ******************** Memory Helper *************** */

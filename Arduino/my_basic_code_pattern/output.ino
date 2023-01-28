@@ -11,8 +11,7 @@
 
 #ifdef TRACE_ON
 #define TRACE_OUTPUT
-//#define TRACE_HSV_HIGH
-//#define TRACE_OUTPUT_HIGH
+#define TRACE_OUTPUT_RGB
 #endif
 
 #define PIXEL_DATA_PIN 12
@@ -108,10 +107,15 @@ void output_init_SET_scene()
 void output_update_SET_scene()
 {
   if(!g_Lamphsv.is_changed()) return;
-
+  
   g_Lamphsv.get_color_rgb(&output_g_color_register_2);
   output_led_set_pixel(0,&output_g_color_register_2);
   output_led_push();
+  #ifdef TRACE_OUTPUT_RGB
+     Serial.print(F("TRACE_OUTPUT_RGB>"));
+     output_dumpRgbToSerial(&output_g_color_register_2);
+  #endif   
+
 }
 
 
@@ -151,6 +155,18 @@ void output_led_push()
   #endif
     light_bar.show();                                  
 }
+
+/* **************** Trace routines ********************** */
+
+#ifdef TRACE_OUTPUT_RGB
+void output_dumpRgbToSerial(t_lamp_rgb_color *pRgb)
+{
+    Serial.print("(");Serial.print(pRgb->r);
+    Serial.print(",");Serial.print(pRgb->g);
+    Serial.print(",");Serial.print(pRgb->b);
+    Serial.println(")");
+}
+#endif
 
 
 

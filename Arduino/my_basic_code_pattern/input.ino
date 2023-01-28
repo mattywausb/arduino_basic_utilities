@@ -178,8 +178,8 @@ int input_encoder_setValue(int newValue) {
   return myEncoder.setValue(newValue);
 }
 
-int input_encoder_setRange(int firstValue, int lastValue, bool wrap) {
-  return myEncoder.configureRange(firstValue,lastValue,1,wrap?ENCODER_H_WRAP:ENCODER_H_NO_WRAP);
+int input_encoder_setRange(int firstValue, int lastValue, int step_size, bool wrap) {
+  return myEncoder.configureRange(firstValue,lastValue,step_size,wrap?ENCODER_H_WRAP:ENCODER_H_NO_WRAP);
 }
 
 int input_encoder_enable() {

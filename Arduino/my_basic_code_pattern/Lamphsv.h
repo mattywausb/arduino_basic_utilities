@@ -144,7 +144,7 @@ class Lamphsv {
           @return rgb values for the current color in as t_lamphsv_color_rgb 
         */
 
-        bool is_changed() {return (m_hue_60_d10 & LAMPHSV_CHANGE_BIT!=0);}
+        bool is_changed() {return ((m_hue_60_d10 & LAMPHSV_CHANGE_BIT)!=0);}
 
         /*!
           Get the current rgb values. This will reset the is_changed flag
