@@ -21,6 +21,7 @@
 
 #define LAMPHSV_CHANGE_BIT 0x4000
 #define LAMPHSV_HUE_SCALE 6144
+#define LAMPHSV_HUE_DOWNSCALE_CORRECTION_BORDER 4334
 #define LAMPHSV_SATURATION_INTERNAL_MAX 128
 #define LAMPHSV_VALUE_INTERNAL_MAX 128
 #define LAMPHSV_8BIT_DECIMALS 7
@@ -33,7 +34,7 @@
 
 
 typedef struct {
-    int16_t h;       // 0-360 Degree  (internally scaled to 6144, wichs leads to 1024 to 60 degree for fast integer arithmetic)
+    int16_t h;       // 0-360 Degree  (internally scaled to 6144, wichs makes 1024 to be 60 degrees for fast integer arithmetic)
     uint8_t s;  // 0-100 with 100 equivalent to 1.00 (internally scaled to 0-128 for fast integer arithmetic)
     uint8_t v;       // 0-100 with 100 equivalent to 1.00 (internally scaled to 0-128 for fast integer arithmetic)
 } t_lamp_hsv_color;
@@ -52,7 +53,7 @@ class Lamphsv {
 
         /*! 
           Set hsv values of the lamp
-          @param hue Define the hue in 1/10s degrees (from 0 to 359)
+          @param hue Define the hue in degrees (from 0 to 359)
           @param saturation Define the saturation with 100  = full color and 0 = no color/white
           @param value Define the value with 100 = full brightness and 0= dark/off
         */

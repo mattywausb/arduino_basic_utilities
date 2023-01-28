@@ -1,14 +1,20 @@
 #include "mainSettings.h"
+#include "Lamphsv.h"
 
 #ifdef TRACE_ON
   #define TRACE_MODES
+  #define TRACE_PARAMETER_CHANGE
 #endif  
 
 /* ------- Mode Control variables ---------- */
 enum PROCESS_MODES {
   SHOW, 
-  SET
+  SET_HUE,
+  SET_SATURATION
 };
+
+Lamphsv g_Lamphsv; // central Lamphsv parameters that will be changed by input
+
 
 PROCESS_MODES g_process_mode=SHOW;
 
@@ -35,13 +41,15 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, true); // light LED during setup
 
+  input_setup();  // first initialize the inputs, in case the output setup takes direct values from it
   output_setup();
-  input_setup();
 
   // init variables
   for(byte k=0;k< KEY_COUNT;k++) {
     press_counter[k]=0;
   }
+
+  g_Lamphsv.set_hsv(0,100,100);
 
   // finally
   digitalWrite(LED_BUILTIN, false); // setup complete, so switch off LED
@@ -53,11 +61,11 @@ void setup() {
 
 void loop() 
 {
-   input_scan_tick();
+   input_scan();
 
    switch(g_process_mode) {
     case SHOW: process_mode_SHOW();break;
-    case SET: process_mode_SET();break;
+    case SET_HUE: process_mode_SET_HUE();break;
    } // switch
 }
 
@@ -66,6 +74,7 @@ void loop()
 void enter_mode_SHOW() 
 {
     g_process_mode=SHOW;
+    input_ignoreUntilRelease(true);
     #ifdef TRACE_MODES
       Serial.println(F("---> SHOW <---"));
       Serial.print(freeMemory());
@@ -73,39 +82,37 @@ void enter_mode_SHOW()
       Serial.print(millis()/1000);
       Serial.println(F(" seconds uptime"));
     #endif  
+    output_init_SHOW_scene();
 }
 
 void process_mode_SHOW() {
   bool input_event_happened=false;
 
-  // Enable/Disable encoder tracking  
-  if(input_encoder_gotPressed()) {
-      encoder_button_press_count++;
-      if(encoder_button_press_count%2) input_encoder_disable();
-      else input_encoder_enable();
-  }
-
-  // Count keyboard presses
-  for(byte k=0;k<KEY_COUNT;k++) {
-    if(input_keyGotPressed( k)) {
-      press_counter[k]++;
-      input_event_happened=true;
-    }
-  }
-
-  // Change to set mode after release from long press of key 0
-  if(input_keyGotReleased(0) ) {
-    if(input_keyGetPressDuration(0)>2000  ) {
-      enter_mode_SET();
+  if(input_isRelevant()) {
+    // Change to set mode in long press of key 1
+    if(input_key_gotPressed(2)) {
+      enter_mode_SET_HUE();
       return;
     }
-    Serial.print("Press Duration 0 = ");      Serial.println(input_keyGetPressDuration(0));
-  }
 
-  // Change to set mode in long press of key 1
-  if(input_keyIsPressed(1) && input_keyGetPressDuration(1)>2000) {
-    enter_mode_SET();
-    return;
+    // Enable/Disable encoder tracking  (just for demo)
+    if(input_encoder_gotPressed()) {
+        encoder_button_press_count++;
+        if(encoder_button_press_count%2) input_encoder_disable();
+        else input_encoder_enable();
+    }
+
+
+
+
+
+    // Count keyboard presses (just for demo)
+    for(byte k=0;k<KEY_COUNT;k++) {
+      if(input_key_gotPressed( k)) {
+        press_counter[k]++;
+        input_event_happened=true;
+      }
+    }
   }
 
   //Print new value when some input changed
@@ -127,11 +134,13 @@ void process_mode_SHOW() {
     Serial.print("Processor Time ");
     uint16_t current_time=millis();
     Serial.print(current_time);
+    Serial.print(" Encoder Value ");
+    Serial.print(input_encoder_getValue());
     Serial.print(" Press Timer ");
     for(byte k=0;k<KEY_COUNT;k++) {
-      Serial.print(input_keyGetPressDuration( k));
+      Serial.print(input_key_getPressDuration( k));
       Serial.print(":");
-      Serial.print(input_keyGetReleaseDuration( k));
+      Serial.print(input_key_getReleaseDuration( k));
       Serial.print("   ");
 
     }
@@ -139,32 +148,43 @@ void process_mode_SHOW() {
   }
 } 
 
-/* ========= MODE SET =================== */
+/* ========= MODE SET_HUE =================== */
 
-void enter_mode_SET() {
+void enter_mode_SET_HUE() {
 
-  g_process_mode=SET;
-  input_ignore_until_release(true);
+  g_process_mode=SET_HUE;
+  input_ignoreUntilRelease(true);
   #ifdef TRACE_MODES
-      Serial.println(F("---> SET <---"));
+      Serial.println(F("---> SET_HUE <---"));
       Serial.print(freeMemory());
       Serial.print(F(" bytes free memory. "));
       Serial.print(millis()/1000);
       Serial.println(F(" seconds uptime"));
   #endif  
+  input_encoder_setRange(0,359,true);
+  input_encoder_setValue(g_Lamphsv.get_hue());
+  output_init_SET_scene();
 }
 
-void process_mode_SET() {
+void process_mode_SET_HUE() {
 
-  // Change to show mode when key 2 got pressed
-  if(input_is_valid()) {
-    if(input_keyGotPressed(2)) {
-        enter_mode_SHOW();
-        return;
+  if(input_isRelevant()) {
+    // Change to show mode when key 2 got pressed
+    if(input_key_gotPressed(2)) {
+      enter_mode_SHOW();
+      return;
+    }
+    if(input_encoder_hasPendingChange()) {
+      g_Lamphsv.set_hue(input_encoder_getValue());
+      #ifdef TRACE_PARAMETER_CHANGE
+        Serial.print(F("TRACE_PARAMETER_CHANGE > hue:"));
+        Serial.println(g_Lamphsv.get_hue());
+        g_Lamphsv.print_members_to_serial();
+      #endif
     }
   } //end "if input is valid"
 
-  output_update_SHOW_scene();
+  output_update_SET_scene(); // out
 }
 
 /* ******************** Memory Helper *************** */

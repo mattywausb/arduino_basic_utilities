@@ -23,7 +23,8 @@ void Lamphsv::set_hsv(int16_t hue,int8_t saturation,int8_t value)
 
 int16_t Lamphsv::get_hue()
 {
-  return ((uint32_t)m_hue_60_d10*360)/LAMPHSV_HUE_SCALE;
+  uint32_t pure_hue=m_hue_60_d10 & ~LAMPHSV_CHANGE_BIT;
+  return (pure_hue/17)-(pure_hue>LAMPHSV_HUE_DOWNSCALE_CORRECTION_BORDER?1:0);
 };
 
 void Lamphsv::set_hue(int16_t angle) 
@@ -33,7 +34,7 @@ void Lamphsv::set_hue(int16_t angle)
   int16_t hue_scaled =((angle*17)+((angle/15))); 
 
   if(m_hue_60_d10!=hue_scaled) {
-    m_hue_60_d10!=hue_scaled;
+    m_hue_60_d10=hue_scaled;
     // set the change flag
     m_hue_60_d10 |= LAMPHSV_CHANGE_BIT;
   }
@@ -298,7 +299,7 @@ void Lamphsv::get_color_rgb(t_lamp_rgb_color *pTarget)
 #ifdef LAMPHSV_ADD_TRACE_METHODS
 void Lamphsv::print_members_to_serial()
 {
-    Serial.print(F("m_hue_60_d10= "));Serial.print(m_hue_60_d10);Serial.print(F(" 0x"));Serial.println(m_hue_60_d10,HEX);
+    Serial.print(F("m_hue_60_d10= "));Serial.print(m_hue_60_d10);Serial.print(F(" 0x"));Serial.print(m_hue_60_d10,HEX);Serial.print(F(" p;"));Serial.println(m_hue_60_d10&~LAMPHSV_CHANGE_BIT);
     Serial.print(F("m_saturation_d7= "));Serial.print(m_saturation_d7);Serial.print(F(" 0x"));Serial.println(m_saturation_d7,HEX);
     Serial.print(F("m_value_d7= "));Serial.print(m_value_d7);Serial.print(F(" 0x"));Serial.println(m_value_d7,HEX);
 };

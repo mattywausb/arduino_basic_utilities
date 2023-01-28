@@ -71,18 +71,37 @@ void input_setup() {
     Serial.print(F("TRACE_INPUT: final debounce durations 0="));
     Serial.print(final_debounce_duration);
   #endif
-  final_debounce_duration=input_keyboardButton[1].configureDebounceWaittime(87);
+  final_debounce_duration=input_keyboardButton[1].configureDebounceWaittime(20);
   #ifdef TRACE_INPUT 
     Serial.print(F("  1="));
     Serial.print(final_debounce_duration);
   #endif
-  final_debounce_duration=input_keyboardButton[2].configureDebounceWaittime(20);
+  final_debounce_duration=input_keyboardButton[2].configureDebounceWaittime(60);
   #ifdef TRACE_INPUT 
     Serial.print(F("  2="));
     Serial.println(final_debounce_duration);
   #endif
 
 }
+
+/* ******************* General scan function ********************
+* call all scan functions and keeps track of last_event timestamp
+*/
+
+void input_scan()
+{
+  if(myEncoder.processChange() || input_switch_scan()) input_last_event_time = millis(); // Reset the global age of interaction
+
+  if(input_ignore_until_release_flag) { // check if any relevant switches ist pressed
+    if(input_encoderButton.isClosed()) return;
+    for(byte s=0;s<KEYBOARD_BUTTON_COUNT;s++) if(input_keyboardButton[s].isClosed()) return;
+    
+  }
+  input_ignore_until_release_flag=false; // if not, we can reset the ignore flag
+
+} // input_scan_tick
+
+
 
 /* ********************************************************************************************************** */
 /*               Interface functions                                                                          */
@@ -103,7 +122,7 @@ int input_getSecondsSinceLastEvent() {
   determines if input events and states can be used or should be ignored (e.g. waiting for releas of all buttons)
   @return true is
 */
-bool input_is_valid() {
+bool input_isRelevant() {
   return !input_ignore_until_release_flag;
 }
 
@@ -112,26 +131,9 @@ bool input_is_valid() {
   until all relevant switches are back open again.
  @param activate boolean if ignore should be started  
 */
-void input_ignore_until_release(bool activate) {
+void input_ignoreUntilRelease(bool activate) {
   input_ignore_until_release_flag=activate;
 }
-
-/* ******************* General scan function ********************
-* call all scan functions and keeps track of last_event timestamp
-*/
-
-void input_scan_tick()
-{
-  if(myEncoder.processChange() || input_switch_scan()) input_last_event_time = millis(); // Reset the global age of interaction
-
-  if(input_ignore_until_release_flag) { // check if any relevant switches ist pressed
-    if(input_encoderButton.isClosed()) return;
-    for(byte s=0;s<KEYBOARD_BUTTON_COUNT;s++) if(input_keyboardButton[s].isClosed()) return;
-    
-  }
-  input_ignore_until_release_flag=false; // if not, we can reset the ignore flag
-
-} // input_scan_tick
 
 
 
@@ -139,14 +141,14 @@ void input_scan_tick()
 /* ************* switch state functions *************** */
 /* This will be adapted to the usecase for better clarity in the functional code */
 
-bool input_keyGotPressed(byte k) { return input_keyboardButton[k].gotClosed(); };
-bool input_keyIsPressed(byte k) { return input_keyboardButton[k].isClosed(); };
-uint16_t input_keyGetPressDuration(byte k) { return input_keyboardButton[k].getClosedDuration(); };
-uint16_t input_keyGetReleaseDuration(byte k) { return input_keyboardButton[k].getOpenDuration(); };
-bool input_keyGotReleased(byte k) { return input_keyboardButton[k].gotOpened(); };
-bool input_keyIsReleased(byte k) { return input_keyboardButton[k].isOpen(); };
+bool input_key_gotPressed(byte k) { return input_keyboardButton[k].gotClosed(); };
+bool input_key_isPressed(byte k) { return input_keyboardButton[k].isClosed(); };
+uint16_t input_key_getPressDuration(byte k) { return input_keyboardButton[k].getClosedDuration(); };
+uint16_t input_key_getReleaseDuration(byte k) { return input_keyboardButton[k].getOpenDuration(); };
+bool input_key_gotReleased(byte k) { return input_keyboardButton[k].gotOpened(); };
+bool input_key_isReleased(byte k) { return input_keyboardButton[k].isOpen(); };
 
-/* ***************** Encoder state functions ************************* */
+/* ***************** Encoder functions ************************* */
 
 bool input_encoder_gotPressed() {
   return input_encoderButton.gotClosed();
@@ -174,6 +176,10 @@ int input_encoder_getValue() {
 
 int input_encoder_setValue(int newValue) {
   return myEncoder.setValue(newValue);
+}
+
+int input_encoder_setRange(int firstValue, int lastValue, bool wrap) {
+  return myEncoder.configureRange(firstValue,lastValue,1,wrap?ENCODER_H_WRAP:ENCODER_H_NO_WRAP);
 }
 
 int input_encoder_enable() {

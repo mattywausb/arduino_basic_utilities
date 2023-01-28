@@ -69,9 +69,9 @@ int16_t Encoder::setValue(int16_t newValue) { // set the current value (whithin 
 
 /* *** */
 int16_t Encoder::getValue() {
-  m_process_flags &= ~ENCODER_H_PENDING_CHANGE_BIT;
+  m_process_flags &= ~ENCODER_H_PENDING_CHANGE_BIT;  // reset pending change bit
   return m_value;
-}; // calling get value will reset "pendingChangeFlag"
+};
 
 /* *********** Processing methods ************** */
 

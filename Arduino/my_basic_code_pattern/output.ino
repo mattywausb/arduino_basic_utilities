@@ -61,15 +61,15 @@ void output_setup()
 
 void output_init_SHOW_scene()
 {
-  output_g_color_register_1.r=0;
-  output_g_color_register_1.g=0;
+  output_g_color_register_1.r=
+  output_g_color_register_1.g=
   output_g_color_register_1.b=0;
   output_g_master_lamp.setCurrentColor(&output_g_color_register_1);
-  output_g_color_register_2.r=255;
-  output_g_color_register_2.g=128;
-  output_g_color_register_2.b=0;
+
+  g_Lamphsv.get_color_rgb(&output_g_color_register_2);
   output_g_master_lamp.setTargetColor(&output_g_color_register_2);
   output_g_counter=0;
+  output_led_set_bar(&output_g_color_register_1);
 }
 
 
@@ -80,31 +80,51 @@ void output_update_SHOW_scene()
   if(output_g_master_lamp.isInTransition()) {
     output_g_master_lamp.getCurrentColor(&output_g_color_register_m);
     output_led_set_bar_range(output_g_counter, output_g_counter+2, &output_g_color_register_m);
-    output_led_show();
+    output_led_push();
   } else {
     if(++output_g_counter>=PIXEL_COUNT-2) output_g_counter=0;
     output_led_set_bar(&output_g_color_register_1);
     output_g_master_lamp.setCurrentColor(&output_g_color_register_1);
     output_g_master_lamp.setTargetColor(&output_g_color_register_2);
-    output_led_show();
+    output_led_push();
     output_g_master_lamp.startTransition(1000);
   }
   
 }
 
+/* ---- SET ---- */
 
+void output_init_SET_scene()
+{
+  output_g_color_register_1.r=
+  output_g_color_register_1.g=
+  output_g_color_register_1.b=0;
+  output_led_set_bar(&output_g_color_register_1);
+  g_Lamphsv.get_color_rgb(&output_g_color_register_2);
+  output_led_set_pixel(0,&output_g_color_register_2);
+  output_led_push();
+}
+
+void output_update_SET_scene()
+{
+  if(!g_Lamphsv.is_changed()) return;
+
+  g_Lamphsv.get_color_rgb(&output_g_color_register_2);
+  output_led_set_pixel(0,&output_g_color_register_2);
+  output_led_push();
+}
 
 
 /* ======== Utilities =========== */
 
-/* set one pixel on the led  manually 
+/* set one pixel on the led  manually  */
 
-void output_led_set_bar_pixel(byte pixel_index, t_lamp_rgb_color*  pColor)
+void output_led_set_pixel(byte pixel_index, t_lamp_rgb_color*  pColor)
 {
   light_bar.setPixelColor(pixel_index, light_bar.Color(pColor->r,pColor->g,pColor->b));
 }
 
-*/
+
 /* set pixel range on the led   */
 void output_led_set_bar_range(byte first_index,byte last_index, t_lamp_rgb_color*  pColor)
 {
@@ -124,7 +144,7 @@ void output_led_set_bar (t_lamp_rgb_color*  pColor)
   };
 } ;
 
-void output_led_show()
+void output_led_push()
 {
   #ifdef TRACE_OUTPUT_HIGH
       Serial.println(F(">output_show"));
