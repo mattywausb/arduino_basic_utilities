@@ -4,6 +4,8 @@
 #ifdef TRACE_ON
   #define TRACE_MODES
   #define TRACE_PARAMETER_CHANGE
+  //#define TRACE_KEYBOARD_STATISTIC
+  #define TRACE_LOOP_THROUGHPUT
 #endif  
 
 /* ------- Mode Control variables ---------- */
@@ -16,8 +18,17 @@ enum PROCESS_MODES {
 
 Lamphsv g_Lamphsv; // central Lamphsv parameters that will be changed by input
 
+
 byte g_step_size=1;
 byte g_set_pixel=0;
+int g_hue_to_time_offset=0;
+
+#ifdef TRACE_LOOP_THROUGHPUT
+uint32_t loop_cumulated_runtime_us=0;
+uint32_t loop_count=0;
+uint32_t loop_longest_runtime=0;
+#endif
+
 
 PROCESS_MODES g_process_mode=SHOW;
 
@@ -64,6 +75,11 @@ void setup() {
 
 void loop() 
 {
+   #ifdef TRACE_LOOP_THROUGHPUT
+   loop_count++;
+   uint32_t loop_start_time_us=micros();
+   #endif
+
    input_scan();
 
    switch(g_process_mode) {
@@ -72,6 +88,24 @@ void loop()
     case SET_SATURATION: process_mode_SET_SATURATION();break;
     case SET_VALUE: process_mode_SET_VALUE();break;
    } // switch
+   
+   #ifdef TRACE_LOOP_THROUGHPUT
+   uint32_t loop_runtime=micros()-loop_start_time_us;
+   loop_cumulated_runtime_us+=loop_runtime;
+   loop_longest_runtime=max(loop_runtime,loop_longest_runtime);
+   if(loop_cumulated_runtime_us>10000000) {
+     uint16_t loop_average_runtime_us=loop_cumulated_runtime_us/loop_count;
+     Serial.print(F("TRACE_LOOP_THROUGHPUT> loop_count="));Serial.print(loop_count);
+     Serial.print(F(" loop_cumulated_runtime_us="));Serial.print(loop_cumulated_runtime_us);
+     Serial.print(F(" loop_longest_runtime="));Serial.print(loop_longest_runtime);
+     Serial.print(F(" loop_average_runtime_us="));Serial.print(loop_average_runtime_us);
+     Serial.print(F(" fps="));Serial.println(1000000/loop_average_runtime_us);
+     loop_cumulated_runtime_us=0;
+     loop_longest_runtime=0;
+     loop_count=0;
+   }
+   #endif
+
 }
 
 /* ========= MODE SHOW =================== */
@@ -87,7 +121,11 @@ void enter_mode_SHOW()
       Serial.print(millis()/1000);
       Serial.println(F(" seconds uptime"));
     #endif  
-    output_init_SHOW_scene();
+
+
+   input_encoder_setRange(0,359,6,true); // Step of 6 = 60 Stepa for 1 circle = 1 Step 1 minute
+   input_encoder_setValue(g_hue_to_time_offset);
+   output_init_SHOW_scene();
 }
 
 void process_mode_SHOW() {
@@ -99,6 +137,11 @@ void process_mode_SHOW() {
       output_init_SET_scene();
       enter_mode_SET_HUE();
       return;
+    }
+
+    // Change calibration mode on key 0
+    if(input_key_gotPressed(0)) {
+      output_flipCalibration();
     }
 
     // Enable/Disable encoder tracking  (just for demo)
@@ -115,6 +158,13 @@ void process_mode_SHOW() {
         input_event_happened=true;
       }
     }
+
+    // tranfer encoder value to state variable
+    if(input_encoder_hasPendingChange()) {
+      g_hue_to_time_offset=input_encoder_getValue();
+      output_update_hand_hue() ;
+    }
+
   }
 
   //Print new value when some input changed
@@ -129,6 +179,7 @@ void process_mode_SHOW() {
 
   output_update_SHOW_scene();
 
+  #ifdef TRACE_KEYBOARD_STATISTIC
   // Dump keyboard values to serial everey DUMP_INTERVAL
   unsigned long current_time = millis();
   if(current_time-prev_dump_time>=DUMP_INTERVAL) {
@@ -148,6 +199,7 @@ void process_mode_SHOW() {
     }
     Serial.println();
   }
+  #endif
 } 
 
 /* ========= MODE SET_HUE =================== */
@@ -163,7 +215,7 @@ void enter_mode_SET_HUE() {
       Serial.print(millis()/1000);
       Serial.println(F(" seconds uptime"));
   #endif  
-  g_step_size=6;
+  g_step_size=15;
   input_encoder_setRange(0,359,g_step_size,true);
   input_encoder_setValue(g_Lamphsv.get_hue());
 }
@@ -184,16 +236,17 @@ void process_mode_SET_HUE() {
       return;
     }
 
+    // Switch to next pixel and flip calibration when key 0 got pressed
     if(input_key_gotPressed(0)) {
       if(++g_set_pixel>=8)g_set_pixel=0;      
+      output_flipCalibration();
       output_update_SET_scene_switch_pixel();
-      return;
     }
     
 
     // Change step size of encoder
     if(input_encoder_gotPressed()) {
-        g_step_size=g_step_size>1?1:6;
+        g_step_size=g_step_size>1?1:15;
         input_encoder_setRange(0,359,g_step_size,true);
     }
 
@@ -238,19 +291,19 @@ void process_mode_SET_SATURATION() {
       return;
     }
 
-
-    if(input_key_gotPressed(0)) {
-      if(++g_set_pixel>=8)g_set_pixel=0;
-      output_update_SET_scene_switch_pixel();
-      return;
-    }
-
     // Change to set hue  mode when key 1 got pressed
-
     if(input_key_gotPressed(1)) {
       enter_mode_SET_VALUE();
       return;
     }
+
+    // Switch to next pixel and flip calibration when key 0 got pressed
+    if(input_key_gotPressed(0)) {
+      if(++g_set_pixel>=8)g_set_pixel=0;
+      output_flipCalibration();
+      output_update_SET_scene_switch_pixel();
+    }
+
 
     // Change step size of encoder
     if(input_encoder_gotPressed()) {
@@ -300,19 +353,19 @@ void process_mode_SET_VALUE() {
       return;
     }
 
-
-    if(input_key_gotPressed(0)) {
-      if(++g_set_pixel>=8)g_set_pixel=0;
-      output_update_SET_scene_switch_pixel();
-      return;
-    }
-
     // Change to set hue  mode when key 1 got pressed
-
     if(input_key_gotPressed(1)) {
       enter_mode_SET_HUE();
       return;
     }
+
+    // Switch to next pixel and flip calibration when key 0 got pressed
+    if(input_key_gotPressed(0)) {
+      if(++g_set_pixel>=8)g_set_pixel=0;
+      output_flipCalibration();
+      output_update_SET_scene_switch_pixel();
+    }
+
 
     // Change step size of encoder
     if(input_encoder_gotPressed()) {

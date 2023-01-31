@@ -6,6 +6,8 @@
 
 #ifdef TRACE_ON
     #define LAMPHSV_ADD_TRACE_METHODS
+    //#define LAMPHSV_TRACE_SET_CALIBRATION
+    //#define LAMPHSV_TRACE_CALIBRATION
 #endif
 
 #define LAMPHSV_HUE_RED 0
@@ -18,6 +20,10 @@
 #define LAMPHSV_HUE_PURPLE 250.0
 #define LAMPHSV_HUE_MAGENTA 300.0
 #define LAMPHSV_HUE_PINK 340.0
+
+#define LAMPHSV_CALIBRATION_INDEX_YELLOW 0
+#define LAMPHSV_CALIBRATION_INDEX_CYAN 1
+#define LAMPHSV_CALIBRATION_INDEX_MAGENTA 2
 
 #define LAMPHSV_CHANGE_BIT 0x4000
 #define LAMPHSV_HUE_SCALE 6144
@@ -72,7 +78,10 @@ class Lamphsv {
           Get hue value 
           @return hue value in 1/10 degress (0-3599)
         */
-        int16_t get_hue(); //one bit is used as change indicator, so we must mask ist
+        int16_t get_hue(); 
+
+
+
 
         /*! 
           Set hue to  a specific angle. Values out of bound will be set to 0.
@@ -86,6 +95,7 @@ class Lamphsv {
           @param angle angle in 1/10 degrees (can be negative)
         */
         void add_hue_angle(int16_t angle) ;
+
 
         /*! 
           Get saturation value 
@@ -167,11 +177,39 @@ class Lamphsv {
           //void print_rgb_to_serial();
         #endif
 
+        /*! 
+          Set the uncalibrated hue, the led is really showing yellow, cyan and magenta. This will
+          be used to corrext the conversion, to provide yellow,cyan, magenta on the hue 60,180,300. This will compensate 
+          for different brightness of the colors. Setting these value might not be necessary, when the initial values in Lamphsv.cpp 
+          match the behaviour of the used LED's
+          @param angle_index The index of the color, this angle will be used 0=yellow, 1=cyan, 2 = magenta
+          @param angle The real(uncompesated) angle the color is shown
+        */
+       static void setCalibrationHueAngle(uint8_t angle_index, uint16_t angle);
+
+       /*!
+        Use the defined hue 
+       */
+       static void enableCalibration() {s_use_calibration=true;};
+       static void disableCalibration() {s_use_calibration=false;};
+       static boolean getCalibrationState() {return s_use_calibration;};
+
+
  protected:
         int16_t m_hue_60_d10;  // hue scaled so it has 60 degrees at bit 11 (10 decimals)
         uint8_t m_saturation_d7;
         uint8_t m_value_d7;
-        
+
+  private:
+        /*! 
+          Get current hue value calibrated
+          @return hue angle
+        */
+        int16_t get_calibrated_hue(); 
+
+       static uint16_t s_calibration_angle_60_d10[3]; // max values at 60,180,300 Degree for red,green, green,blue, blue,red transition
+       static bool s_use_calibration;
+
 };
         
 #endif

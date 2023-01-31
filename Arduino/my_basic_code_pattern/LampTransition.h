@@ -4,8 +4,10 @@
 #include "mainSettings.h"
 
 
-// the following typedef is also declared in Lamphsv.h so we need to ensure only one declaraion 
-
+#ifdef TRACE_ON
+//#define TRACE_LAMPTRANSITION_MODULATION
+//#define TRACE_LAMPTRANSITION_EVENTS
+#endif
 
 
 #define LAMPTRANSITION_PENDING_INDICATOR 0xffff
@@ -50,34 +52,37 @@ class LampTransition
       (more efficient pointer version, only pushes 2 bytes to the stack )
       @param pRGBColor : Pointer to a t_lamp_rgb_color struct
     */
-    void setCurrentColor(t_lamp_rgb_color * pRGBColor) {m_current_red=pRGBColor->r; m_current_green=pRGBColor->g; m_current_blue=pRGBColor->b; m_transition_duration_16ms=LAMPTRANSITION_DONE_INDICATOR;};
+    void setCurrentColor(t_lamp_rgb_color * pRGBColor) {m_current_red=pRGBColor->r; m_current_green=pRGBColor->g; m_current_blue=pRGBColor->b; 
+                                                      m_transition_duration_16ms=LAMPTRANSITION_DONE_INDICATOR;
+                                                      };
 
     /*!
-      set the current color. This will stop the the transition and set the color to the given values. The transition
-      duration will be set to 0.
-      At the end of the transition, the target color becomes the current color
+      change the color to transition to. If already in transition, this will change the direction but not the timeline.
+      At the end of the transition, the target color becomes the current color. If the target is equal to the current color, the lamp 
+      will count as completly transitioned immediatly.
       @param red : Amount of red in 8 bit (255= max value)
       @param green : Amount of green in 8 bit (255= max value)
       @param blue : Amount of green in 8 bit (255= max value)
       @
     */
-    void setTargetColor(uint8_t red, uint8_t green, uint8_t blue) {m_target_red=red; m_target_green=green; m_target_blue=blue; m_transition_duration_16ms=LAMPTRANSITION_PENDING_INDICATOR;};
+    void setTargetColor(uint8_t red, uint8_t green, uint8_t blue) { t_lamp_rgb_color myColor;myColor.r=red; myColor.g=green; myColor.b=blue;setTargetColor(&myColor);};
 
     /*!
       change the color to transition to. If already in transition, this will change the direction but not the timeline.
-      At the end of the transition, the target color becomes the current color
+      At the end of the transition, the target color becomes the current color. If the target is equal to the current color, the lamp 
+      will count as completly transitioned immediatly.
       (more efficient pointer version, only pushes 2 bytes to the stack )
       @param red : Amount of red in 8 bit (255= max value)
       @param green : Amount of green in 8 bit (255= max value)
       @param blue : Amount of green in 8 bit (255= max value)
       @
     */
-    void setTargetColor(t_lamp_rgb_color * pRGBColor) {m_target_red= pRGBColor->r; m_target_green=pRGBColor->g; m_target_blue=pRGBColor->b; m_transition_duration_16ms=LAMPTRANSITION_PENDING_INDICATOR;};
+    void setTargetColor(t_lamp_rgb_color * pRGBColor);
 
 
     /*!
       Initiate the transition from the current color to the target color for the given duration. last setCurrentTime will be used as start time
-      @param duration_ms : Duration of the transition in ms (will be capped to 1.048 seconds and reduced in granularity to 16ms)
+      @param duration_ms : Duration of the transition in ms (will be capped to 1048 seconds(17 Minutes) and reduced to 16ms granularity)
     */
     void startTransition(uint32_t duration_ms);
 
@@ -91,13 +96,13 @@ class LampTransition
       Calculate and provide the transition color for the point in time set by setCurrentTime()
       @return rgb color type with the current values
     */
-    t_lamp_rgb_color getCurrentColor() {t_lamp_rgb_color myColor; getCurrentColor(&myColor); return myColor;}; 
+    t_lamp_rgb_color getModulatedColor() {t_lamp_rgb_color myColor; getModulatedColor(&myColor); return myColor;}; 
 
     /*! 
       Calculate and provide the transition color for the point in time set by setCurrentTime()
       @param pTarget Pointer ot a t_lamp_rgb_color variable type with the current values
     */
-     void getCurrentColor(t_lamp_rgb_color *pTarget); 
+     void getModulatedColor(t_lamp_rgb_color *pTarget); 
 
     /*!
       Determine if the lamp is in transition. Can be used to prevent unnecessary calls to get current color

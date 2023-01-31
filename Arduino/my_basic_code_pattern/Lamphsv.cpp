@@ -2,14 +2,30 @@
 #include "Arduino.h"
 
 
+uint16_t Lamphsv::s_calibration_angle_60_d10[3] = {0x0400,0x0c00,0x1400}; // Angles of yellow, cyan, magenta in 60_d10
+bool  Lamphsv::s_use_calibration=true;
 
 Lamphsv::Lamphsv(void)
 {
+  // Initialize to white with half brightness
   m_hue_60_d10=0;
   m_saturation_d7=0;
-  m_value_d7=LAMPHSV_VALUE_INTERNAL_MAX;
+  m_value_d7=LAMPHSV_VALUE_INTERNAL_MAX>>1;
 }
 
+
+static void Lamphsv::setCalibrationHueAngle (uint8_t angle_index, uint16_t angle)
+{
+  if(angle_index < 3) {
+    while(angle<0) angle+=360;
+    while(angle>359) angle-=360;
+    s_calibration_angle_60_d10[angle_index]=((angle*17)+((angle/15))); 
+    #ifdef LAMPHSV_TRACE_SET_CALIBRATION
+      Serial.print(F("LAMPHSV_TRACE_SET_CALIBRATION > angle_index= "));Serial.print(angle_index);
+      Serial.print(F(" angel in 60_d10="));Serial.println(s_calibration_angle_60_d10[angle_index]);
+    #endif
+  }
+}
 
 void Lamphsv::set_hsv(int16_t hue,int8_t saturation,int8_t value) 
 {
@@ -17,7 +33,6 @@ void Lamphsv::set_hsv(int16_t hue,int8_t saturation,int8_t value)
   set_saturation(saturation);
   set_value(value);
 };
-
 
 // ============= HUE Methods ====================
 
@@ -59,6 +74,7 @@ void Lamphsv::add_hue_angle(int16_t delta_angle)
     m_hue_60_d10 |= LAMPHSV_CHANGE_BIT;
   }
 }
+
 
 // ============= SAATURATION Methods ====================
 
@@ -224,6 +240,10 @@ void Lamphsv::multiply_value(int16_t factor)
 // ============= THe final converter ====================
 
 
+
+
+
+
 #define D7_DECIMALS 7
 #define D10_DECIMALS 10
 #define D10_DECIMAL_MASK 0x03ff
@@ -231,6 +251,31 @@ void Lamphsv::multiply_value(int16_t factor)
 #define VALUE_1_D20 0x100000
 #define VALUE_1_D10 1024
 #define SCALE_SHIFT 3
+
+int16_t Lamphsv::get_calibrated_hue() {
+    int16_t hue_60_d10;
+    int8_t segment=m_hue_60_d10>>D10_DECIMALS; 
+    int16_t segment_base_60_d10=VALUE_1_D10*segment;
+    int16_t segment_distance_60_d10=m_hue_60_d10 & D10_DECIMAL_MASK;
+    int8_t color_sector=segment>>1;
+
+    int16_t calibrated_distance_60_d10;
+    int16_t final_hue_60_d10;
+
+    if((segment&0x01) == 0) { //from prime to mixed
+        calibrated_distance_60_d10=s_calibration_angle_60_d10[color_sector]-segment_base_60_d10;
+        final_hue_60_d10=segment_base_60_d10+(((uint32_t)segment_distance_60_d10*calibrated_distance_60_d10)>>D10_DECIMALS);        
+    } else {   // from mixed to prime
+        calibrated_distance_60_d10=segment_base_60_d10+VALUE_1_D10-s_calibration_angle_60_d10[color_sector];
+        final_hue_60_d10 = s_calibration_angle_60_d10[color_sector]+(((uint32_t)segment_distance_60_d10*calibrated_distance_60_d10)>>D10_DECIMALS);
+    };
+    #ifdef LAMPHSV_TRACE_CALIBRATION
+      Serial.print(F("LAMPHSV_TRACE_CALIBRATION> calibrated hue="));
+      Serial.println((final_hue_60_d10/17)-(final_hue_60_d10>LAMPHSV_HUE_DOWNSCALE_CORRECTION_BORDER?1:0));
+    #endif
+
+    return final_hue_60_d10;
+}; 
 
 t_lamp_rgb_color Lamphsv::get_color_rgb() {
   t_lamp_rgb_color result;
@@ -240,11 +285,16 @@ t_lamp_rgb_color Lamphsv::get_color_rgb() {
 
 void Lamphsv::get_color_rgb(t_lamp_rgb_color *pTarget)
 {
-  // first remove the change flag, so the hue value is clean
+   // reset change Flag
   m_hue_60_d10&=~LAMPHSV_CHANGE_BIT;
 
-  int8_t hue_segment=m_hue_60_d10>>D10_DECIMALS;   // "Divide hue degrees by 60" (6 Segments starting with red - yellow- green- cyan - blue - magenta)
-  int16_t hue_segment_fraction_d10=m_hue_60_d10 & D10_DECIMAL_MASK; //Get last 10 Bits = "Modulo 60" = fraction inside in the segment
+  // first remove the change flag, so the hue value is clean
+  int16_t final_hue_60_d10;
+  if(s_use_calibration) final_hue_60_d10=get_calibrated_hue();
+  else final_hue_60_d10=m_hue_60_d10;
+
+  int8_t hue_segment=final_hue_60_d10>>D10_DECIMALS;   // "Divide hue degrees by 60" (6 Segments starting with red - yellow- green- cyan - blue - magenta)
+  int16_t hue_segment_fraction_d10=final_hue_60_d10 & D10_DECIMAL_MASK; //Get last 10 Bits = "Modulo 60" = fraction inside in the segment
   int16_t white_factor_d7=((int16_t)m_value_d7*((int16_t)VALUE_1_D7-(int16_t)m_saturation_d7))>>D7_DECIMALS; // >>7 for Decimal point shifting
 
   int32_t partner_segment_fraction_d20;
